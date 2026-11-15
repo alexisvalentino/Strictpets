@@ -184,6 +184,286 @@ const HEADS: Record<MascotId, ReactNode> = {
       <ellipse cx="60" cy="72" rx="4.5" ry="3.5" fill="#1E293B" />
     </g>
   ),
+  chick: (
+    <g>
+      {/* little head tuft */}
+      <path d="M60 26 Q54 12 60 8 Q62 18 66 12 Q68 22 60 26 Z" fill="#FACC15" stroke="#EAB308" strokeWidth="2" strokeLinejoin="round" />
+      {/* tiny wings peeking out */}
+      <ellipse cx="20" cy="76" rx="8" ry="13" fill="#FDE047" stroke="#EAB308" strokeWidth="2.5" transform="rotate(-18 20 76)" />
+      <ellipse cx="100" cy="76" rx="8" ry="13" fill="#FDE047" stroke="#EAB308" strokeWidth="2.5" transform="rotate(18 100 76)" />
+      <circle cx="60" cy="64" r="40" fill="#FDE047" />
+      <circle cx="60" cy="64" r="40" fill="none" stroke="#EAB308" strokeWidth="3" />
+      {/* orange beak */}
+      <path d="M53 70 L67 70 L60 78 Z" fill="#FB923C" stroke="#EA580C" strokeWidth="1.5" strokeLinejoin="round" />
+    </g>
+  ),
+  frog: (
+    <g>
+      {/* eye bumps on top of the head */}
+      <circle cx="40" cy="34" r="15" fill="#86EFAC" stroke="#22C55E" strokeWidth="3" />
+      <circle cx="80" cy="34" r="15" fill="#86EFAC" stroke="#22C55E" strokeWidth="3" />
+      <circle cx="60" cy="66" r="40" fill="#86EFAC" />
+      <circle cx="60" cy="66" r="40" fill="none" stroke="#22C55E" strokeWidth="3" />
+      {/* cover the bump outlines where they meet the head */}
+      <circle cx="40" cy="38" r="12" fill="#86EFAC" />
+      <circle cx="80" cy="38" r="12" fill="#86EFAC" />
+      {/* nostrils */}
+      <circle cx="56" cy="71" r="1.6" fill="#15803D" />
+      <circle cx="64" cy="71" r="1.6" fill="#15803D" />
+    </g>
+  ),
+  fish: (
+    <g>
+      {/* tail fin behind the head */}
+      <path d="M96 64 L116 46 Q110 64 116 82 Z" fill="#FB923C" stroke="#EA580C" strokeWidth="2.5" strokeLinejoin="round" />
+      {/* top fin */}
+      <path d="M44 28 Q60 6 78 28 Z" fill="#FB923C" stroke="#EA580C" strokeWidth="2.5" strokeLinejoin="round" />
+      <circle cx="60" cy="64" r="40" fill="#FDBA74" />
+      <circle cx="60" cy="64" r="40" fill="none" stroke="#EA580C" strokeWidth="3" />
+      {/* soft scales + side fin */}
+      <g stroke="#FB923C" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.7">
+        <path d="M80 50 Q86 54 80 58" />
+        <path d="M86 62 Q92 66 86 70" />
+        <path d="M80 74 Q86 78 80 82" />
+      </g>
+      <path d="M28 82 Q16 88 22 96 Q30 92 32 86 Z" fill="#FB923C" />
+      {/* bubbles */}
+      <circle cx="20" cy="30" r="4" fill="none" stroke="#7DD3FC" strokeWidth="2" />
+      <circle cx="12" cy="18" r="2.5" fill="none" stroke="#7DD3FC" strokeWidth="2" />
+    </g>
+  ),
+  hamster: (
+    <g>
+      {/* small round ears */}
+      <circle cx="32" cy="32" r="10" fill="#F5C78E" stroke="#D99A4E" strokeWidth="2.5" />
+      <circle cx="32" cy="32" r="5" fill="#FCA5A5" opacity="0.7" />
+      <circle cx="88" cy="32" r="10" fill="#F5C78E" stroke="#D99A4E" strokeWidth="2.5" />
+      <circle cx="88" cy="32" r="5" fill="#FCA5A5" opacity="0.7" />
+      <circle cx="60" cy="64" r="40" fill="#F5C78E" />
+      <circle cx="60" cy="64" r="40" fill="none" stroke="#D99A4E" strokeWidth="3" />
+      {/* chubby white cheek pouches + face blaze */}
+      <ellipse cx="34" cy="80" rx="15" ry="12" fill="#FFF7ED" />
+      <ellipse cx="86" cy="80" rx="15" ry="12" fill="#FFF7ED" />
+      <path d="M54 28 Q60 42 66 28 Z" fill="#FFF7ED" />
+      <path d="M57 72 Q57 69 60 69 Q63 69 63 72 Q63 75 60 77 Q57 75 57 72 Z" fill="#F472B6" />
+    </g>
+  ),
+  penguin: (
+    <g>
+      <circle cx="60" cy="64" r="40" fill="#334155" />
+      <circle cx="60" cy="64" r="40" fill="none" stroke="#1E293B" strokeWidth="3" />
+      {/* white heart-shaped face */}
+      <path d="M60 50 Q44 36 32 52 Q24 72 40 88 Q50 98 60 98 Q70 98 80 88 Q96 72 88 52 Q76 36 60 50 Z" fill="#FFFFFF" />
+      {/* beak */}
+      <path d="M53 70 L67 70 L60 78 Z" fill="#FB923C" stroke="#EA580C" strokeWidth="1.5" strokeLinejoin="round" />
+    </g>
+  ),
+  fox: (
+    <g>
+      {/* tall pointed ears */}
+      <path d="M24 44 L28 10 L54 32 Z" fill="#FB923C" stroke="#C2410C" strokeWidth="3" strokeLinejoin="round" />
+      <path d="M96 44 L92 10 L66 32 Z" fill="#FB923C" stroke="#C2410C" strokeWidth="3" strokeLinejoin="round" />
+      <path d="M31 34 L33 18 L45 29 Z" fill="#1E293B" opacity="0.8" />
+      <path d="M89 34 L87 18 L75 29 Z" fill="#1E293B" opacity="0.8" />
+      <circle cx="60" cy="64" r="40" fill="#FB923C" />
+      <circle cx="60" cy="64" r="40" fill="none" stroke="#C2410C" strokeWidth="3" />
+      {/* white cheeks meeting at the muzzle */}
+      <path d="M22 70 Q38 66 60 92 Q82 66 98 70 Q94 96 60 104 Q26 96 22 70 Z" fill="#FFF7ED" />
+      <ellipse cx="60" cy="74" rx="4.5" ry="3.5" fill="#1E293B" />
+    </g>
+  ),
+  koala: (
+    <g>
+      {/* big fluffy ears */}
+      <circle cx="24" cy="40" r="20" fill="#94A3B8" stroke="#64748B" strokeWidth="3" />
+      <circle cx="24" cy="40" r="11" fill="#F1F5F9" />
+      <circle cx="96" cy="40" r="20" fill="#94A3B8" stroke="#64748B" strokeWidth="3" />
+      <circle cx="96" cy="40" r="11" fill="#F1F5F9" />
+      <circle cx="60" cy="64" r="40" fill="#A8B4C4" />
+      <circle cx="60" cy="64" r="40" fill="none" stroke="#64748B" strokeWidth="3" />
+      {/* big oval nose (the koala signature) */}
+      <ellipse cx="60" cy="72" rx="8" ry="10" fill="#334155" />
+      <ellipse cx="57.5" cy="68" rx="2" ry="3" fill="#FFFFFF" opacity="0.35" />
+    </g>
+  ),
+  pig: (
+    <g>
+      {/* little folded ears */}
+      <path d="M26 42 L28 18 L48 32 Z" fill="#F9A8D4" stroke="#EC4899" strokeWidth="3" strokeLinejoin="round" />
+      <path d="M94 42 L92 18 L72 32 Z" fill="#F9A8D4" stroke="#EC4899" strokeWidth="3" strokeLinejoin="round" />
+      <circle cx="60" cy="64" r="40" fill="#FBCFE8" />
+      <circle cx="60" cy="64" r="40" fill="none" stroke="#EC4899" strokeWidth="3" />
+      {/* snout */}
+      <ellipse cx="60" cy="73" rx="10" ry="7" fill="#F9A8D4" stroke="#EC4899" strokeWidth="2" />
+      <ellipse cx="56.5" cy="73" rx="2" ry="3" fill="#BE185D" />
+      <ellipse cx="63.5" cy="73" rx="2" ry="3" fill="#BE185D" />
+    </g>
+  ),
+  owl: (
+    <g>
+      {/* ear tufts */}
+      <path d="M28 40 L22 12 L46 30 Z" fill="#A16207" stroke="#854D0E" strokeWidth="3" strokeLinejoin="round" />
+      <path d="M92 40 L98 12 L74 30 Z" fill="#A16207" stroke="#854D0E" strokeWidth="3" strokeLinejoin="round" />
+      <circle cx="60" cy="64" r="40" fill="#CA8A04" />
+      <circle cx="60" cy="64" r="40" fill="none" stroke="#854D0E" strokeWidth="3" />
+      {/* big pale eye discs (pupils render on top) */}
+      <circle cx="45" cy="60" r="12" fill="#FEF3C7" />
+      <circle cx="75" cy="60" r="12" fill="#FEF3C7" />
+      {/* beak */}
+      <path d="M56 70 L64 70 L60 79 Z" fill="#FB923C" stroke="#C2410C" strokeWidth="1.5" strokeLinejoin="round" />
+      {/* chest feathers */}
+      <g stroke="#854D0E" strokeWidth="1.8" fill="none" opacity="0.5" strokeLinecap="round">
+        <path d="M44 94 Q48 98 52 94" />
+        <path d="M56 97 Q60 101 64 97" />
+        <path d="M68 94 Q72 98 76 94" />
+      </g>
+    </g>
+  ),
+  turtle: (
+    <g>
+      {/* little shell dome behind the head */}
+      <path d="M20 58 Q24 14 60 12 Q96 14 100 58 Z" fill="#65A30D" stroke="#3F6212" strokeWidth="3" strokeLinejoin="round" />
+      <g fill="#84CC16" stroke="#3F6212" strokeWidth="2">
+        <path d="M48 22 L60 18 L72 22 L70 34 L50 34 Z" />
+        <path d="M30 36 L44 30 L48 42 L36 50 L26 48 Z" />
+        <path d="M90 36 L76 30 L72 42 L84 50 L94 48 Z" />
+      </g>
+      <circle cx="60" cy="68" r="36" fill="#A3E635" />
+      <circle cx="60" cy="68" r="36" fill="none" stroke="#4D7C0F" strokeWidth="3" />
+    </g>
+  ),
+  tiger: (
+    <g>
+      <circle cx="30" cy="30" r="12" fill="#FB923C" stroke="#C2410C" strokeWidth="2.5" />
+      <circle cx="30" cy="30" r="5.5" fill="#FFF7ED" />
+      <circle cx="90" cy="30" r="12" fill="#FB923C" stroke="#C2410C" strokeWidth="2.5" />
+      <circle cx="90" cy="30" r="5.5" fill="#FFF7ED" />
+      <circle cx="60" cy="64" r="40" fill="#FB923C" />
+      <circle cx="60" cy="64" r="40" fill="none" stroke="#C2410C" strokeWidth="3" />
+      {/* forehead + cheek stripes */}
+      <g fill="#1E293B">
+        <path d="M54 26 L60 40 L66 26 Z" />
+        <path d="M46 28 L50 38 L52 28 Z" />
+        <path d="M74 28 L70 38 L68 28 Z" />
+        <path d="M20 58 L34 62 L20 66 Z" />
+        <path d="M22 72 L34 72 L24 78 Z" />
+        <path d="M100 58 L86 62 L100 66 Z" />
+        <path d="M98 72 L86 72 L96 78 Z" />
+      </g>
+      {/* white muzzle */}
+      <ellipse cx="52" cy="82" rx="10" ry="8" fill="#FFF7ED" />
+      <ellipse cx="68" cy="82" rx="10" ry="8" fill="#FFF7ED" />
+      <path d="M56 72 L64 72 L60 77 Z" fill="#F472B6" />
+    </g>
+  ),
+  lion: (
+    <g>
+      {/* fluffy mane */}
+      <g fill="#D97706">
+        {Array.from({ length: 14 }, (_, i) => {
+          const a = (i / 14) * Math.PI * 2;
+          return (
+            <circle key={i} cx={60 + Math.cos(a) * 44} cy={64 + Math.sin(a) * 44} r="13" />
+          );
+        })}
+      </g>
+      <circle cx="60" cy="64" r="44" fill="#D97706" />
+      {/* round ears inside the mane */}
+      <circle cx="32" cy="34" r="9" fill="#FCD34D" stroke="#B45309" strokeWidth="2" />
+      <circle cx="88" cy="34" r="9" fill="#FCD34D" stroke="#B45309" strokeWidth="2" />
+      <circle cx="60" cy="64" r="36" fill="#FCD34D" />
+      <circle cx="60" cy="64" r="36" fill="none" stroke="#B45309" strokeWidth="2.5" />
+      <ellipse cx="60" cy="81" rx="13" ry="9" fill="#FFF7ED" />
+      <path d="M55 72 L65 72 L60 78 Z" fill="#92400E" />
+    </g>
+  ),
+  monkey: (
+    <g>
+      {/* side ears */}
+      <circle cx="18" cy="62" r="14" fill="#A16207" stroke="#713F12" strokeWidth="2.5" />
+      <circle cx="18" cy="62" r="7" fill="#FCD9B6" />
+      <circle cx="102" cy="62" r="14" fill="#A16207" stroke="#713F12" strokeWidth="2.5" />
+      <circle cx="102" cy="62" r="7" fill="#FCD9B6" />
+      <circle cx="60" cy="64" r="40" fill="#A16207" />
+      <circle cx="60" cy="64" r="40" fill="none" stroke="#713F12" strokeWidth="3" />
+      {/* heart-shaped face */}
+      <path d="M60 52 Q48 36 36 46 Q26 58 34 76 Q42 96 60 98 Q78 96 86 76 Q94 58 84 46 Q72 36 60 52 Z" fill="#FCD9B6" />
+      <circle cx="56.5" cy="73" r="1.7" fill="#713F12" />
+      <circle cx="63.5" cy="73" r="1.7" fill="#713F12" />
+    </g>
+  ),
+  unicorn: (
+    <g>
+      {/* rainbow mane behind */}
+      <path d="M86 30 Q108 40 104 72 Q100 60 92 56 Z" fill="#C4B5FD" />
+      <path d="M90 40 Q112 58 102 88 Q98 72 90 64 Z" fill="#F9A8D4" />
+      {/* ears */}
+      <path d="M30 40 L34 14 L50 30 Z" fill="#FFFFFF" stroke="#CBD5E1" strokeWidth="2.5" strokeLinejoin="round" />
+      <path d="M90 40 L86 14 L70 30 Z" fill="#FFFFFF" stroke="#CBD5E1" strokeWidth="2.5" strokeLinejoin="round" />
+      <circle cx="60" cy="64" r="40" fill="#FFFFFF" />
+      <circle cx="60" cy="64" r="40" fill="none" stroke="#CBD5E1" strokeWidth="3" />
+      {/* golden horn */}
+      <path d="M53 28 L60 2 L67 28 Z" fill="#FDE68A" stroke="#F59E0B" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M55 20 L65 17 M56 13 L64 11" stroke="#F59E0B" strokeWidth="1.5" />
+      {/* forelock */}
+      <path d="M44 30 Q52 20 64 28 Q56 30 54 40 Q50 32 44 30 Z" fill="#C4B5FD" />
+      <path d="M60 28 Q70 22 78 32 Q70 32 66 38 Q64 32 60 28 Z" fill="#F9A8D4" />
+      {/* soft nostrils */}
+      <ellipse cx="56" cy="76" rx="1.6" ry="1.2" fill="#CBD5E1" />
+      <ellipse cx="64" cy="76" rx="1.6" ry="1.2" fill="#CBD5E1" />
+    </g>
+  ),
+  octopus: (
+    <g>
+      {/* curly tentacles below */}
+      <g fill="#C4B5FD" stroke="#8B5CF6" strokeWidth="2.5" strokeLinejoin="round">
+        <path d="M26 88 Q14 104 24 112 Q30 102 36 96 Z" />
+        <path d="M44 96 Q40 114 50 116 Q52 106 54 100 Z" />
+        <path d="M66 100 Q68 114 76 114 Q76 104 74 96 Z" />
+        <path d="M84 92 Q96 106 104 102 Q94 96 92 86 Z" />
+      </g>
+      {/* tall round mantle */}
+      <ellipse cx="60" cy="58" rx="40" ry="44" fill="#C4B5FD" />
+      <ellipse cx="60" cy="58" rx="40" ry="44" fill="none" stroke="#8B5CF6" strokeWidth="3" />
+      {/* spots */}
+      <circle cx="44" cy="30" r="4" fill="#A78BFA" />
+      <circle cx="74" cy="26" r="5" fill="#A78BFA" />
+      <circle cx="62" cy="40" r="3" fill="#A78BFA" />
+    </g>
+  ),
+  dragon: (
+    <g>
+      {/* small rounded horns */}
+      <path d="M36 34 Q26 10 40 8 Q42 22 48 30 Z" fill="#FDE68A" stroke="#D97706" strokeWidth="2.5" strokeLinejoin="round" />
+      <path d="M84 34 Q94 10 80 8 Q78 22 72 30 Z" fill="#FDE68A" stroke="#D97706" strokeWidth="2.5" strokeLinejoin="round" />
+      {/* ear fins */}
+      <path d="M22 54 L4 44 L12 64 Z" fill="#6EE7B7" stroke="#059669" strokeWidth="2.5" strokeLinejoin="round" />
+      <path d="M98 54 L116 44 L108 64 Z" fill="#6EE7B7" stroke="#059669" strokeWidth="2.5" strokeLinejoin="round" />
+      <circle cx="60" cy="64" r="40" fill="#6EE7B7" />
+      <circle cx="60" cy="64" r="40" fill="none" stroke="#059669" strokeWidth="3" />
+      {/* forehead scales */}
+      <g fill="#34D399">
+        <circle cx="52" cy="34" r="4" />
+        <circle cx="60" cy="30" r="4.5" />
+        <circle cx="68" cy="34" r="4" />
+      </g>
+      {/* cream snout + nostrils */}
+      <ellipse cx="60" cy="80" rx="15" ry="10" fill="#D1FAE5" />
+      <circle cx="56" cy="76" r="1.7" fill="#047857" />
+      <circle cx="64" cy="76" r="1.7" fill="#047857" />
+    </g>
+  ),
+};
+
+// Pets whose faces sit on dark fur get white eyes so they stay visible.
+const LIGHT_EYES: ReadonlySet<MascotId> = new Set<MascotId>(['panda']);
+// Shift the shared mouth down under beaks / big snouts so they don't overlap.
+const MOUTH_DY: Partial<Record<MascotId, number>> = {
+  chick: 8,
+  penguin: 8,
+  owl: 8,
+  pig: 6,
+  koala: 8,
 };
 
 // Cosmetic overlays drawn on top of the face (positions are shared across all
@@ -254,24 +534,27 @@ const Mascot = ({
   variant = 'bear',
   accessory = null,
   className,
+  still = false,
 }: {
   mood: Mood;
   variant?: MascotId;
   accessory?: AccessoryId | null;
   className?: string;
+  still?: boolean; // no idle animation (dense grids, locked silhouettes)
 }) => {
   const sad = mood === 'sad';
   const happy = mood === 'happy';
-  // Panda eyes sit on black patches, so they render in white to stay visible.
-  const eyeColor = variant === 'panda' ? '#FFFFFF' : '#1E293B';
+  const eyeColor = LIGHT_EYES.has(variant) ? '#FFFFFF' : '#1E293B';
 
-  const animationClass = sad
-    ? 'mascot-wobble'
-    : happy
-      ? 'mascot-happy-bounce'
-      : mood === 'running'
-        ? 'mascot-bob'
-        : 'mascot-breathe';
+  const animationClass = still
+    ? ''
+    : sad
+      ? 'mascot-wobble'
+      : happy
+        ? 'mascot-happy-bounce'
+        : mood === 'running'
+          ? 'mascot-bob'
+          : 'mascot-breathe';
 
   return (
     <div className={`relative ${className ?? ''}`}>
@@ -330,7 +613,7 @@ const Mascot = ({
             <path d="M70 62 Q75 68 80 62" />
           </g>
         ) : (
-          <g className={mood === 'idle' ? 'mascot-blink' : undefined}>
+          <g className={mood === 'idle' && !still ? 'mascot-blink' : undefined}>
             {/* white sclera under the pupils (classic cute panda eyes) */}
             {variant === 'panda' && (
               <>
@@ -362,6 +645,7 @@ const Mascot = ({
         )}
 
         {/* mouth */}
+        <g transform={`translate(0 ${MOUTH_DY[variant] ?? 0})`}>
         {happy ? (
           <g>
             <path d="M50 76 Q60 94 70 76 Z" fill="#1E293B" />
@@ -389,6 +673,7 @@ const Mascot = ({
         ) : (
           <path d="M52 80 Q60 87 68 80" stroke="#1E293B" strokeWidth="4" strokeLinecap="round" fill="none" />
         )}
+        </g>
 
         {/* equipped cosmetic accessory (on top of everything) */}
         {accessory && ACCESSORIES[accessory]}

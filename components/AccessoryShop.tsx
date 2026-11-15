@@ -1,5 +1,139 @@
 'use client';
+import Icon from './Icon';
 import { ACCESSORY_CATALOG, type AccessoryId } from '../lib/gameState';
+
+// Accessory product art. These are shop products, not icons: each is a filled
+// illustration on its own 32x32 grid with a darker edge and a light catch, so
+// it reads as an object at 30px instead of a flat silhouette. Emoji was doing
+// this job before; these are drawn here so they keep real colours instead of
+// inheriting the surrounding text like a glyph would.
+const ART: Record<AccessoryId, JSX.Element> = {
+  flower: (
+    <>
+      <path
+        d="M16 29c0-6 .5-9 1.5-11"
+        stroke="hsl(145 55% 42%)"
+        strokeWidth="2"
+        strokeLinecap="round"
+        fill="none"
+      />
+      <path
+        d="M17 22c3.5 0 6-2 6.5-5-3.5-.4-6 1.6-6.5 5Z"
+        fill="hsl(145 55% 52%)"
+      />
+      <g fill="hsl(347 83% 68%)">
+        <ellipse cx="16" cy="7.5" rx="4" ry="5" />
+        <ellipse cx="16" cy="20.5" rx="4" ry="5" />
+        <ellipse cx="9.5" cy="14" rx="5" ry="4" />
+        <ellipse cx="22.5" cy="14" rx="5" ry="4" />
+        <ellipse cx="16" cy="7.5" rx="4" ry="5" fill="#fff" opacity="0.22" />
+        <ellipse cx="22.5" cy="14" rx="5" ry="4" fill="#fff" opacity="0.14" />
+      </g>
+      <circle cx="16" cy="14" r="4.2" fill="#FBBF24" />
+      <circle cx="16" cy="14" r="2.1" fill="#FDE68A" />
+    </>
+  ),
+  bow: (
+    <>
+      <path
+        d="M14.5 16 5.5 9.6a3.6 3.6 0 0 0-1.6 6.4 3.6 3.6 0 0 0 1.6 6.4L14.5 16Z"
+        fill="hsl(350 84% 52%)"
+      />
+      <path
+        d="M17.5 16l9-6.4a3.6 3.6 0 0 1 1.6 6.4 3.6 3.6 0 0 1-1.6 6.4L17.5 16Z"
+        fill="hsl(350 84% 52%)"
+      />
+      <path
+        d="M5.5 9.6a3.6 3.6 0 0 0 0 12.8"
+        stroke="#fff"
+        strokeWidth="1.2"
+        opacity="0.28"
+        fill="none"
+      />
+      <rect x="13.2" y="13.2" width="5.6" height="5.6" rx="2" fill="hsl(350 88% 40%)" />
+      <rect x="14.4" y="14.4" width="3.2" height="3.2" rx="1.3" fill="#fff" opacity="0.35" />
+      <path
+        d="M14 20.4 12.4 27l3.6-2.2L19 27l-1.6-6.6"
+        fill="hsl(350 84% 52%)"
+        opacity="0.85"
+      />
+    </>
+  ),
+  'party-hat': (
+    <>
+      <path d="M16 5.5 25 25H7L16 5.5Z" fill="hsl(268 62% 58%)" />
+      <path d="M16 5.5 20.6 15h-9.2L16 5.5Z" fill="#fff" opacity="0.2" />
+      <path
+        d="M11.2 17.6h9.6M9 22.6h14"
+        stroke="#fff"
+        strokeWidth="1.8"
+        opacity="0.65"
+        strokeLinecap="round"
+      />
+      <circle cx="16" cy="4.6" r="2.6" fill="#FBBF24" />
+      <circle cx="15.2" cy="3.9" r="1" fill="#FEF3C7" />
+    </>
+  ),
+  cap: (
+    <>
+      <path
+        d="M4.5 18.5a11.5 11.5 0 0 1 23 0v1.4H4.5v-1.4Z"
+        fill="hsl(199 89% 48%)"
+      />
+      <path
+        d="M4.5 18.5a11.5 11.5 0 0 1 7-10.6"
+        stroke="#fff"
+        strokeWidth="1.4"
+        opacity="0.25"
+        fill="none"
+      />
+      <path
+        d="M27.5 19.9h1.6a1.9 1.9 0 0 1 0 3.8h-12"
+        stroke="hsl(199 95% 38%)"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        fill="none"
+      />
+      <circle cx="16" cy="10" r="1.5" fill="#fff" opacity="0.5" />
+      <path d="M4.5 22.2h23" stroke="#fff" strokeWidth="1" opacity="0.15" />
+    </>
+  ),
+  sunglasses: (
+    <>
+      <path
+        d="M2.6 11h6.8l1.2 5a3.6 3.6 0 0 1-7.2 0L2.6 11ZM29.4 11h-6.8l-1.2 5a3.6 3.6 0 0 0 7.2 0l.8-5Z"
+        fill="hsl(222 47% 25%)"
+      />
+      <path
+        d="M9.4 12.6h13.2"
+        stroke="hsl(222 32% 40%)"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M2.6 8.8 3.9 11M29.4 8.8 28.1 11"
+        stroke="hsl(222 32% 40%)"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+      <path d="M4.6 12.6h3.4l.5 2.2" stroke="#fff" strokeWidth="1.2" opacity="0.4" fill="none" />
+    </>
+  ),
+  crown: (
+    <>
+      <path
+        d="M4 23 2.4 9.4l7 5.6L16 5l6.6 10 7-5.6L28 23H4Z"
+        fill="hsl(45 93% 52%)"
+      />
+      <path d="M4 23 2.4 9.4l7 5.6L16 5l6.6 10 7-5.6L28 23H4Z" fill="#fff" opacity="0.12" />
+      <path d="M4.6 25.6h22.8" stroke="hsl(38 92% 42%)" strokeWidth="2.6" strokeLinecap="round" />
+      <circle cx="16" cy="5" r="2.2" fill="#DC2626" />
+      <circle cx="4.6" cy="10" r="1.6" fill="#38BDF8" />
+      <circle cx="27.4" cy="10" r="1.6" fill="#38BDF8" />
+      <circle cx="16" cy="18" r="2" fill="#DC2626" opacity="0.9" />
+    </>
+  ),
+};
 
 interface AccessoryShopProps {
   coins: number;
@@ -16,43 +150,56 @@ const AccessoryShop = ({
   onBuy,
   onEquip,
 }: AccessoryShopProps) => (
-  <div className="mt-3 w-full rounded-2xl border border-slate-200/70 bg-white p-4 text-left shadow-sm">
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        <span className="text-base leading-none">🎀</span>
-        <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">
+  <section className="mt-3 w-full rounded-2xl border border-slate-200/70 bg-white p-4 text-left shadow-sm">
+    <header className="flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2.5 text-slate-500">
+        <Icon name="ribbon" size={16} plate />
+        <h2 className="text-[11px] font-black uppercase tracking-widest">
           Accessories
-        </p>
+        </h2>
       </div>
-      <span className="whitespace-nowrap rounded-full bg-sky-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-brand-600">
-        🪙 {coins}
+      <span className="flex items-center gap-1 whitespace-nowrap rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-black tabular-nums text-brand-600">
+        <Icon name="coin" size={11} />
+        {coins}
       </span>
-    </div>
+    </header>
 
-    <div className="mt-3 grid grid-cols-3 gap-2">
+    {/* Three columns only where a cell can hold a 44px-wide button; on the
+        narrowest phone-landscape viewports two columns keep the price legible
+        instead of clipping it. */}
+    <ul className="mt-3 grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
       {ACCESSORY_CATALOG.map(item => {
         const owned = ownedAccessories.includes(item.id);
         const active = equippedAccessory === item.id;
         const affordable = coins >= item.price;
         return (
-          <div
+          <li
             key={item.id}
-            className={`relative overflow-hidden rounded-xl border p-2 text-center transition-all duration-150 ${
-              active ? 'border-brand-300 bg-brand-50 shadow-sm' : 'border-slate-200 bg-white'
+            className={`relative flex flex-col rounded-xl border p-2 text-center transition-all duration-150 ${
+              active
+                ? 'border-brand-300 bg-brand-50 shadow-sm'
+                : 'border-slate-200 bg-white'
             }`}
           >
-            <div className="absolute -right-3 -top-3 h-8 w-8 rounded-full bg-white/70" />
-            <span className="block text-xl">{item.emoji}</span>
-            <p className="mt-1 text-[10px] font-black text-slate-700">{item.name}</p>
-            <p className="text-[9px] font-bold text-slate-400">🪙 {item.price}</p>
+            <span className="mx-auto" aria-hidden>
+              <svg viewBox="0 0 32 32" width={32} height={32} fill="none">
+                {ART[item.id]}
+              </svg>
+            </span>
+            <p className="mt-1 text-[11px] font-black text-slate-700">{item.name}</p>
+            <p className="flex items-center justify-center gap-0.5 text-[10px] font-bold tabular-nums text-slate-400">
+              <Icon name="coin" size={10} />
+              {item.price}
+            </p>
             {active ? (
-              <span className="mt-1.5 block rounded-lg bg-brand-600 py-1 text-[9px] font-black uppercase tracking-wide text-white">
-                ✓ Worn
+              <span className="mt-1.5 flex items-center justify-center gap-1 rounded-lg bg-brand-600 py-1.5 text-[10px] font-black uppercase tracking-wide text-white">
+                <Icon name="check" size={11} />
+                Worn
               </span>
             ) : owned ? (
               <button
                 onClick={() => onEquip(item.id)}
-                className="mt-1.5 w-full rounded-lg border border-brand-400 bg-white py-1 text-[9px] font-black uppercase tracking-wide text-brand-600 transition-transform active:scale-95"
+                className="mt-1.5 min-h-11 w-full rounded-lg border border-brand-400 bg-white py-1 text-[10px] font-black uppercase tracking-wide text-brand-600 transition-transform active:scale-95"
               >
                 Wear
               </button>
@@ -60,29 +207,30 @@ const AccessoryShop = ({
               <button
                 onClick={() => onBuy(item.id)}
                 disabled={!affordable}
-                className={`mt-1.5 w-full rounded-lg py-1 text-[9px] font-black uppercase tracking-wide transition-transform active:scale-95 ${
+                className={`mt-1.5 min-h-11 w-full rounded-lg py-1 text-[10px] font-black uppercase tracking-wide transition-transform active:scale-95 ${
                   affordable
                     ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-white shadow-sm shadow-amber-500/30'
                     : 'cursor-not-allowed bg-slate-100 text-slate-400'
                 }`}
               >
-                Buy {item.price} 🪙
+                Buy {item.price}
               </button>
             )}
-          </div>
+          </li>
         );
       })}
-    </div>
+    </ul>
 
     {equippedAccessory && (
       <button
         onClick={() => onEquip(null)}
-        className="mt-2 w-full rounded-lg border border-slate-200 bg-white py-1.5 text-[9px] font-black uppercase tracking-wide text-slate-500 transition-transform active:scale-95"
+        className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white py-1.5 text-[10px] font-black uppercase tracking-wide text-slate-500 transition-transform active:scale-95"
       >
-        ✕ Remove accessory
+        <Icon name="close" size={11} />
+        Remove accessory
       </button>
     )}
-  </div>
+  </section>
 );
 
 export default AccessoryShop;

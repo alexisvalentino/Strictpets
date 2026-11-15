@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from 'next';
 import { Roboto_Flex } from 'next/font/google';
-import Script from 'next/script';
 
 import 'tailwindcss/tailwind.css';
 /* Core CSS required for Ionic components to work properly */
@@ -24,7 +23,7 @@ import '../styles/variables.css';
 
 export const metadata: Metadata = {
   title: 'Focus Tracker',
-  description: 'A productivity focus timer that resets to zero if you touch your phone. Built with Next.js, Ionic, and Capacitor.',
+  description: 'A friendly focus buddy: set the phone down and focus alongside your pet to grow streaks, coins, and a collection of friends.',
 };
 
 export const viewport: Viewport = {
@@ -52,17 +51,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={roboto.variable}>
+      {/* No remote scripts: the app runs fully offline and never executes
+          third-party code (icons are emoji/inline SVG). */}
       <body>{children}</body>
-      <Script
-        type="module"
-        src="https://unpkg.com/ionicons@5.2.3/dist/ionicons/ionicons.esm.js"
-        strategy="lazyOnload"
-      />
-      <Script
-        noModule
-        src="https://unpkg.com/ionicons@5.2.3/dist/ionicons/ionicons.js"
-        strategy="lazyOnload"
-      />
     </html>
   );
 }

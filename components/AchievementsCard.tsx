@@ -1,4 +1,5 @@
 'use client';
+import Icon, { type IconName } from './Icon';
 import {
   ACHIEVEMENTS,
   unlockedCount,
@@ -19,64 +20,65 @@ interface AchievementsCardProps extends AchievementStats {}
 const AchievementsCard = ({
   longestSession,
   bestStreak,
-  trees,
-  jackpots,
+  petsOwned,
+  focusSeconds,
   totalSessions,
+  jackpots,
 }: AchievementsCardProps) => {
   const stats: AchievementStats = {
     totalSessions,
     bestStreak,
-    trees,
+    petsOwned,
+    focusSeconds,
     longestSession,
     jackpots,
   };
   const unlocked = unlockedCount(stats);
-  const records = [
-    { label: 'Longest', value: formatDuration(longestSession), emoji: '🏆' },
-    { label: 'Trees', value: String(trees), emoji: '🌳' },
-    { label: 'Best streak', value: `${bestStreak}d`, emoji: '🔥' },
-    { label: 'Jackpots', value: String(jackpots), emoji: '🎰' },
+  const records: { label: string; value: string; icon: IconName }[] = [
+    { label: 'Longest', value: formatDuration(longestSession), icon: 'timer' },
+    { label: 'Friends', value: String(petsOwned), icon: 'paw' },
+    { label: 'Best streak', value: `${bestStreak}d`, icon: 'flame' },
+    { label: 'Jackpots', value: String(jackpots), icon: 'dice' },
   ];
 
   return (
-    <div className="mt-3 w-full rounded-2xl border border-slate-200/70 bg-white p-4 text-left shadow-sm">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-base leading-none">🏆</span>
-          <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">
+    <section className="mt-3 w-full rounded-2xl border border-slate-200/70 bg-white p-4 text-left shadow-sm">
+      <header className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5 text-slate-500">
+          <Icon name="trophy" size={16} plate />
+          <h2 className="text-[11px] font-black uppercase tracking-widest">
             Achievements
-          </p>
+          </h2>
         </div>
-        <span className="whitespace-nowrap rounded-full bg-sky-50 px-2 py-0.5 text-[9px] font-black tabular-nums tracking-wider text-brand-600">
+        <span className="whitespace-nowrap rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-black tabular-nums tracking-wider text-brand-600">
           {unlocked}/{ACHIEVEMENTS.length} unlocked
         </span>
-      </div>
+      </header>
 
       {/* personal records */}
-      <div className="mt-3 grid grid-cols-4 gap-2">
+      <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {records.map(r => (
           <div
             key={r.label}
-            className="relative overflow-hidden rounded-xl border border-sky-100 bg-gradient-to-b from-sky-50 to-white p-2 text-center shadow-sm"
+            className="rounded-xl border border-sky-100 bg-gradient-to-b from-sky-50 to-white p-2 text-center shadow-sm"
           >
-            <div className="absolute -right-3 -top-3 h-8 w-8 rounded-full bg-white/70" />
-            <span className="relative block text-sm">{r.emoji}</span>
-            <p className="relative mt-0.5 truncate text-[13px] font-black tabular-nums text-slate-800">
+            <Icon name={r.icon} size={16} className="mx-auto text-brand-500" />
+            <dd className="mt-1 truncate text-[13px] font-black tabular-nums text-slate-800">
               {r.value}
-            </p>
-            <p className="relative mt-0.5 text-[8px] font-bold uppercase tracking-wide text-slate-500">
+            </dd>
+            <dt className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">
               {r.label}
-            </p>
+            </dt>
           </div>
         ))}
-      </div>
+      </dl>
 
       {/* unlock badges */}
-      <div className="mt-3 grid grid-cols-3 gap-2">
+      <ul className="mt-3 grid grid-cols-3 gap-2">
         {ACHIEVEMENTS.map(a => {
           const done = a.unlocked(stats);
           return (
-            <div
+            <li
               key={a.id}
               className={`relative overflow-hidden rounded-xl border p-2 text-center transition-all duration-150 ${
                 done
@@ -84,30 +86,37 @@ const AchievementsCard = ({
                   : 'border-slate-200 bg-slate-50'
               }`}
             >
-              <div className="absolute -right-3 -top-3 h-8 w-8 rounded-full bg-white/70" />
-              <span
-                className={`relative block text-xl ${done ? '' : 'opacity-60 grayscale'}`}
-              >
-                {a.emoji}
-              </span>
+              <Icon
+                name={a.icon}
+                size={20}
+                plate
+                // Earned badges keep their own identity hue - a gold trophy, a
+                // sky-blue timer - instead of all turning one flat green, which
+                // made the finished set look like a status column.
+                tone={done ? undefined : 'slate'}
+              />
               {!done && (
-                <span className="absolute right-1 top-1 text-[10px]">🔒</span>
+                <Icon
+                  name="lock"
+                  size={11}
+                  className="absolute right-1 top-1 text-slate-300"
+                />
               )}
               <p
-                className={`relative mt-1 text-[9px] font-black leading-tight ${
-                  done ? 'text-emerald-700' : 'text-slate-400'
+                className={`mt-1 text-[10px] font-black leading-tight ${
+                  done ? 'text-slate-800' : 'text-slate-400'
                 }`}
               >
                 {a.name}
               </p>
-              <p className="relative mt-0.5 text-[8px] font-semibold leading-tight text-slate-400">
+              <p className="mt-0.5 text-[10px] font-semibold leading-tight text-slate-400">
                 {a.desc}
               </p>
-            </div>
+            </li>
           );
         })}
-      </div>
-    </div>
+      </ul>
+    </section>
   );
 };
 

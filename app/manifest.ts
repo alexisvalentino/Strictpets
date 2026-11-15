@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'Focus Tracker',
     short_name: 'Focus',
     description:
-      'A productivity focus timer that resets to zero if you touch your phone. Built with Next.js, Ionic, and Capacitor.',
+      'A friendly focus buddy: set the phone down and focus alongside your pet to grow streaks, coins, and a collection of friends.',
     start_url: '/',
     display: 'standalone',
     background_color: '#7DD3FC',
