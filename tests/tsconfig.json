@@ -1,0 +1,14 @@
+{
+  // Compiles only the pure game-logic layer to CommonJS for tests/verify-rewards.js.
+  "compilerOptions": {
+    "outDir": "../.tmp-gs",
+    "module": "commonjs",
+    "target": "es2019",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "lib": ["es2019", "dom"],
+    "types": []
+  },
+  "files": ["../lib/gameState.ts"]
+}
