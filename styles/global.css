@@ -105,8 +105,14 @@
 
 body {
   overflow: hidden;
+  /* 100vh is measured against the largest viewport, so it clips or jumps when
+     the visible area shrinks (keyboard open, browser chrome). dvh follows the
+     visible viewport. The vh line stays as the fallback for older Android
+     WebViews that do not understand dvh. */
   height: 100vh;
-  width: 100vw;
+  height: 100dvh;
+  /* 100% instead of 100vw: vw includes the desktop scrollbar gutter. */
+  width: 100%;
   background-color: #EFF6FF;
   font-family: var(--ion-font-family);
   -webkit-tap-highlight-color: transparent;
