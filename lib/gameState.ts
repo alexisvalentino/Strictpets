@@ -285,9 +285,6 @@ export const defaultGameState = (): GameState => ({
 });
 
 // --- Calendar helpers ---
-export const epochDay = (d: Date = new Date()): number =>
-  Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
-
 export const todayKey = (d: Date = new Date()): string => {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -621,10 +618,9 @@ export const recordSession = (
   const focusedMinutes = Math.floor(seconds / 60);
 
   let currentStreak = s.currentStreak;
-  let streakIncreased = true;
   let freezeUsed = 0;
   if (s.lastFocusDate === t) {
-    streakIncreased = false; // already focused today — streak unchanged
+    // Already focused today — the streak is unchanged, not extended.
   } else if (s.lastFocusDate === yesterdayKey(now)) {
     currentStreak += 1;
   } else if (s.lastFocusDate !== null && s.currentStreak > 0) {
@@ -680,8 +676,9 @@ export const recordSession = (
       weekendBonus,
       newRecord,
       recordBonus,
-      streakIncreased,
-
+      // `streakIncreased` reports whether the streak count actually moved, so
+      // the UI never announces a day that did not advance.
+      streakIncreased: currentStreak > s.currentStreak,
       streak: currentStreak,
       bestStreak: state.bestStreak,
       dailyGoalReached:
