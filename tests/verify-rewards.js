@@ -244,46 +244,53 @@ console.log('== 7. Streak repair ==');
   ok(!gs.repairStreak(poor).repaired, 'one repair cannot erase multiple missed days');
 }
 
-console.log('== 8. Streak freeze (buy + consume) ==');
+console.log('== 8. Streak shield: one prepaid day ==');
 {
-  let s = base();
-  s.coins = gs.STREAK_FREEZE_COST;
+  // One shield covers one missed day. Hoarding a stock of them made the rule
+  // hard to explain (freezes only paid out when they covered the *whole* gap)
+  // and turned the Home screen into two competing protection cards.
+  ok(gs.STREAK_FREEZE_MAX === 1, `one shield max (got ${gs.STREAK_FREEZE_MAX})`);
+
+  let s = { ...base(), currentStreak: 3, bestStreak: 3, lastFocusDate: gs.todayKey(), coins: 999 };
+  ok(gs.canBuyStreakFreeze(s), 'a live streak can buy a shield');
   const b1 = gs.buyStreakFreeze(s);
-  ok(b1.ok && b1.state.streakFreezes === 1 && b1.state.coins === 0, `freeze bought for ${gs.STREAK_FREEZE_COST}`);
-  b1.state.coins = gs.STREAK_FREEZE_COST;
-  const b2 = gs.buyStreakFreeze(b1.state);
-  ok(b2.ok, 'second freeze ok');
-  b2.state.coins = 500;
-  const b3 = gs.buyStreakFreeze(b2.state);
-  ok(b3.ok, 'third freeze ok');
-  const b4 = gs.buyStreakFreeze(b3.state);
-  ok(!b4.ok, 'capped at 3 freezes');
-  ok(!gs.buyStreakFreeze(base()).ok, 'cannot buy with 0 coins');
+  ok(b1.ok && b1.state.streakFreezes === 1 && b1.state.coins === 999 - gs.STREAK_FREEZE_COST, `shield bought for ${gs.STREAK_FREEZE_COST}`);
+  ok(!gs.buyStreakFreeze(b1.state).ok, 'cannot hold two shields');
+  ok(!gs.canBuyStreakFreeze({ ...s, currentStreak: 0 }), 'nothing to protect without a streak');
+  ok(!gs.buyStreakFreeze({ ...s, coins: 0 }).ok, 'cannot buy without coins');
 
-  // Freeze saves a missed-day streak
-  let f = base();
-  f.currentStreak = 2;
-  f.streakFreezes = 1;
-  f.coins = 0;
-  const d = new Date();
-  d.setDate(d.getDate() - 2); // missed 1 full day
-  f.lastFocusDate = gs.todayKey(d);
+  const twoAgo = new Date();
+  twoAgo.setDate(twoAgo.getDate() - 2);
+  ok(!gs.canBuyStreakFreeze({ ...s, lastFocusDate: gs.todayKey(twoAgo) }), 'a shield cannot be bought once the day is already missed');
+
+  // Consumed exactly once, bridging one missed day.
+  const f = { ...base(), currentStreak: 2, bestStreak: 2, streakFreezes: 1, lastFocusDate: gs.todayKey(twoAgo) };
   const fs = gs.recordSession(f, 60, new Date());
-  ok(fs.result.streak === 3, 'freeze saves streak (2 -> 3)');
-  ok(fs.result.freezeUsed === 1, 'freeze consumed');
-  ok(fs.state.streakFreezes === 0, 'shield spent');
+  ok(fs.result.streak === 3, 'shield saves a one-day gap (2 -> 3)');
+  ok(fs.result.freezeUsed === 1 && fs.state.streakFreezes === 0, 'shield consumed');
 
-  // Gap too large to fully cover -> streak resets, freeze NOT consumed
-  let g = base();
-  g.currentStreak = 2;
-  g.streakFreezes = 1;
-  const d2 = new Date();
-  d2.setDate(d2.getDate() - 4); // missed 3 full days, need 3 freezes
-  g.lastFocusDate = gs.todayKey(d2);
+  // A two-day gap is beyond one shield: streak restarts, shield is kept.
+  const threeAgo = new Date();
+  threeAgo.setDate(threeAgo.getDate() - 3);
+  const g = { ...base(), currentStreak: 2, bestStreak: 2, streakFreezes: 1, lastFocusDate: gs.todayKey(threeAgo) };
   const gs2 = gs.recordSession(g, 60, new Date());
-  ok(gs2.result.streak === 1, 'uncovered gap resets streak');
-  ok(gs2.result.freezeUsed === 0 && gs2.state.streakFreezes === 1, 'freeze kept when not fully covering');
-}console.log('== 9. Forest removed: saves migrate without losing progress ==');
+  ok(gs2.result.streak === 1, 'one shield cannot bridge two missed days');
+  ok(gs2.result.freezeUsed === 0 && gs2.state.streakFreezes === 1, 'shield kept when it cannot save the streak');
+
+  // Legacy saves holding 2+ shields are clamped and refunded for the extras so
+  // nobody loses coins to the new one-shield rule.
+  const saved = global.localStorage;
+  global.localStorage = {
+    getItem: () => JSON.stringify({ currentStreak: 4, streakFreezes: 3, coins: 0 }),
+    setItem: () => {},
+  };
+  const migrated = gs.loadGameState();
+  global.localStorage = saved;
+  ok(migrated.streakFreezes === gs.STREAK_FREEZE_MAX, 'legacy shield stock clamps to one');
+  ok(migrated.coins === 2 * gs.STREAK_FREEZE_COST, 'extra legacy shields are refunded');
+}
+
+console.log('== 9. Forest removed: saves migrate without losing progress ==');
 {
   // Focused minutes still count toward lifetime focus (the pet collection
   // measures it) — no session may silently lose time now the forest is gone.
@@ -452,7 +459,8 @@ console.log('== 13b. Streak expiry, repair window, and advance freezes ==');
     lastFocusDate: '2026-08-18', dailyProgressDate: '2026-08-18',
     claimedDays: [1, 2, 3, 4, 5], coins: 200 };
   const rolled = gs.normalizeForToday(missed, now);
-  ok(gs.activeStreak(rolled, now) === 5, 'a one-day gap is still recoverable, so the streak stays visible');  ok(rolled.currentStreak === 5 && gs.canRepairStreak(rolled, now), 'old streak retained only for repair window');
+  ok(gs.activeStreak(rolled, now) === 5, 'a one-day gap is still recoverable, so the streak stays visible');
+  ok(rolled.currentStreak === 5 && gs.canRepairStreak(rolled, now), 'old streak retained only for repair window');
   ok(rolled.bestStreak === 5, 'personal best retained after miss');
   // The store validates the same rule against the actual current date.
   const realYesterday = new Date(); realYesterday.setDate(realYesterday.getDate() - 2);
@@ -806,29 +814,25 @@ console.log('== 29. Long sessions keep their full value toward pets ==');
   ok(gs.focusMinutes(s) === 240, '240 min toward pet unlocks');
 }
 
-console.log('== 30. Freezes are spent only when they save the streak; repair needs focus ==');
+console.log('== 30. The shield is spent only when it saves the streak ==');
 {
-  // A freeze in the repair window should cover the gap itself.
+  // A shield in the repair window should cover the gap itself.
   const now = new Date(2026, 8, 20, 10);
   const inWindow = { ...base(), currentStreak: 5, bestStreak: 5, lastFocusDate: '2026-09-18', streakFreezes: 1 };
   ok(gs.activeStreak(inWindow, now) === 5, 'a missed day stays on screen during the one-day window');
-  ok(gs.activeStreak({ ...inWindow, streakFreezes: 0 }, now) === 5, 'the streak shows even without a freeze (it is repairable)');
-  ok(gs.activeStreak({ ...inWindow, lastFocusDate: '2026-09-17', streakFreezes: 0 }, now) === 0, 'a two-day gap without shields is gone');
-  ok(!gs.canRepairStreak(inWindow, now), 'no paid repair needed when a freeze covers the day');
+  ok(gs.activeStreak({ ...inWindow, streakFreezes: 0 }, now) === 5, 'the streak shows even without a shield (it is repairable)');
+  ok(gs.activeStreak({ ...inWindow, lastFocusDate: '2026-09-17', streakFreezes: 0 }, now) === 0, 'a two-day gap without a shield is gone');
+  ok(!gs.canRepairStreak(inWindow, now), 'no paid repair needed when a shield covers the day');
 
-  // A repairable gap (yesterday missed) is covered by the paid repair; the
-  // one pre-owned shield is only spent when the gap needs it.
-  const repairable = { ...base(), currentStreak: 5, bestStreak: 5, lastFocusDate: '2026-09-18', streakFreezes: 2 };
+  // One shield bridges exactly one missed day.
+  const repairable = { ...base(), currentStreak: 5, bestStreak: 5, lastFocusDate: '2026-09-18', streakFreezes: 1 };
   const r = gs.recordSession(repairable, 60, now);
-  ok(r.state.currentStreak === 6 && r.result.freezeUsed === 1, 'freezes bridge the missed day (6, 1 used)');
-  // Not enough shields for a three-day gap: they stay in stock.
+  ok(r.state.currentStreak === 6 && r.result.freezeUsed === 1, 'the shield bridges the missed day (6, 1 used)');
+  ok(r.state.streakFreezes === 0, 'and is spent');
+  // Two missed days are beyond one shield: it stays in stock.
   const gap5 = { ...base(), currentStreak: 5, bestStreak: 5, lastFocusDate: '2026-09-17', streakFreezes: 1 };
   const kept = gs.recordSession(gap5, 60, now);
-  ok(kept.state.currentStreak === 1 && kept.state.streakFreezes === 1, 'shields stay in stock when they cannot bridge the gap');
-  // Enough shields for the missed days: they save the streak and are spent.
-  const covered = { ...base(), currentStreak: 5, bestStreak: 5, lastFocusDate: '2026-09-17', streakFreezes: 2 };
-  const saved = gs.recordSession(covered, 60, now);
-  ok(saved.state.currentStreak === 6 && saved.result.freezeUsed === 2, 'shields bridge the gap and are spent (6, 2 used)');
+  ok(kept.state.currentStreak === 1 && kept.state.streakFreezes === 1, 'the shield stays in stock when it cannot bridge the gap');
 
   // Repair is a one-day make-up for a lapsed streak (used before you focus).
   const lastMonth = new Date(2026, 7, 20, 10);
@@ -839,7 +843,9 @@ console.log('== 30. Freezes are spent only when they save the streak; repair nee
   // Once today's session is banked there is nothing left to repair.
   const alreadyToday = { ...lapsedStreak, lastFocusDate: gs.todayKey(lastMonth) };
   ok(!gs.canRepairStreak(alreadyToday, lastMonth) && !gs.repairStreak(alreadyToday, lastMonth).repaired, 'nothing to repair after focusing today');
-}console.log('== 31. Failing costs the streak of the day you fail on ==');
+}
+
+console.log('== 31. Failing costs the streak of the day you fail on ==');
 {
   const now = new Date(2026, 8, 20, 10);
   // Focused yesterday, no session yet today: the streak is still alive.

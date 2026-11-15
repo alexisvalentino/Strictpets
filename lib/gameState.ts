@@ -34,12 +34,20 @@ export const checkinMultiplier = (cycles: number): number =>
 // Escalated reward for Day N of the current cycle (cycle number = jackpots).
 export const checkinReward = (day: number, cycles: number): number =>
   Math.round(DAY_REWARDS[day - 1] * checkinMultiplier(cycles));
-// --- Streak freeze (Duolingo model) ---
-// Buy protection BEFORE a miss: each freeze covers one missed day, so the
-// streak survives a gap instead of resetting. Complements the paid repair
-// (repair = pay after, freeze = pay before).
+// --- Streak shield (one prepaid day) ---
+// Buy the shield BEFORE a miss and it covers exactly one missed day, so the
+// streak survives instead of resetting. It complements the paid repair
+// (repair = pay after, shield = pay before).
+//
+// There is deliberately one shield, not a stock. A stock only paid out when it
+// covered the *whole* gap, which made the rule impossible to explain in a card
+// and made two Home widgets compete over the same decision.
 export const STREAK_FREEZE_COST = 120;
-export const STREAK_FREEZE_MAX = 3; // cap how many can be hoarded (base)
+export const STREAK_FREEZE_MAX = 1;
+// The retired stock never held more than three shields, so migration only ever
+// refunds what could legitimately have been bought. Without this cap a
+// corrupted save claiming 99 shields would mint a fortune in coins.
+export const LEGACY_STREAK_FREEZE_STOCK = 3;
 // --- Event mechanics (the banners are real) ---
 export const WEEKEND_MULTIPLIER = 2; // ×2 coins for sessions on Sat/Sun
 export const RECORD_BONUS = 50; // coins for beating your longest session
@@ -237,7 +245,7 @@ export interface GameState {
   activeMascot: MascotId; // the one currently equipped
   ownedAccessories: AccessoryId[]; // cosmetics bought in the shop
   equippedAccessory: AccessoryId | null; // the one worn by the mascot
-  streakFreezes: number; // unused streak-freeze shields (0..STREAK_FREEZE_MAX)
+  streakFreezes: number; // unused streak shields (0..STREAK_FREEZE_MAX)
   focusSeconds: number; // lifetime focused seconds (every completed session, in full)
   ownedThemes: ThemeId[]; // themes bought (blue is always owned)
   activeTheme: ThemeId; // the one applied to the whole app
@@ -427,6 +435,15 @@ export const loadGameState = (): GameState => {
     const dailyProgressDate =
       validDateKey(parsed.dailyProgressDate) ?? lastFocusDate;
     const totalSessions = safeInt(parsed.totalSessions);
+    // The shield stock was retired in favour of a single prepaid shield. Keep
+    // one and refund the coins for the rest, so no player is out of pocket. A
+    // count the old shop could never have sold is treated as corruption: it is
+    // capped without paying a refund, so a damaged save cannot mint coins.
+    const storedFreezes = safeInt(parsed.streakFreezes);
+    const trustedFreezes =
+      storedFreezes <= LEGACY_STREAK_FREEZE_STOCK ? storedFreezes : STREAK_FREEZE_MAX;
+    const streakFreezes = Math.min(trustedFreezes, STREAK_FREEZE_MAX);
+    const freezeRefund = Math.max(0, trustedFreezes - STREAK_FREEZE_MAX) * STREAK_FREEZE_COST;
     const claimedValues = Array.isArray(parsed.claimedDays)
       ? new Set(parsed.claimedDays.filter(Number.isSafeInteger))
       : new Set<number>();
@@ -449,7 +466,7 @@ export const loadGameState = (): GameState => {
       activeMascot,
       ownedAccessories,
       equippedAccessory,
-      streakFreezes: safeInt(parsed.streakFreezes, STREAK_FREEZE_MAX),
+      streakFreezes,
       focusSeconds: lifetimeFocusSeconds(parsed),
       ownedThemes,
       activeTheme,
@@ -460,6 +477,9 @@ export const loadGameState = (): GameState => {
       lastCheckinDate: validDateKey(parsed.lastCheckinDate),
       focusLog: sanitizeFocusLog(parsed.focusLog),
     };
+    // Retired shield stock comes back as coins (see `freezeRefund` above). The
+    // field is rewritten on the next save, so this is idempotent.
+    loaded.coins += freezeRefund;
     // The forest is gone as of v6. Coins a player donated to it were spent on
     // something they can no longer see, so they come back once — refunded the
     // first time an older save is loaded and then zeroed, which makes the
@@ -624,16 +644,16 @@ export const recordSession = (
   } else if (s.lastFocusDate === yesterdayKey(now)) {
     currentStreak += 1;
   } else if (s.lastFocusDate !== null && s.currentStreak > 0) {
-    // Missed one or more full days. Each freeze shields one missed day;
-    // they only get consumed if they fully cover the gap and save the streak.
+    // Missed one or more full days. One shield covers exactly one missed day,
+    // so it is only spent when the gap is a single day and it saves the streak.
     const missed = daysBetween(s.lastFocusDate, t); // >= 2
     const need = missed - 1;
-    if (need > 0 && s.streakFreezes >= need) {
+    if (need === 1 && s.streakFreezes >= 1) {
       currentStreak += 1;
-      freezeUsed = need;
+      freezeUsed = 1;
     } else {
-      // Not enough shields to bridge the whole gap. They stay in stock so a
-      // future missed day can still be protected, and the streak restarts.
+      // The shield cannot bridge this gap, so it stays in stock for a future
+      // single missed day, and the streak restarts.
       currentStreak = 1;
     }
   } else {
@@ -1146,21 +1166,26 @@ export const equipAccessory = (
   return { state: { ...s, equippedAccessory: id }, ok: true };
 };
 
-// Buy streak-freeze protection (capped so coins stay meaningful).
+// Whether a shield can be bought right now. The card and the purchase both
+// read this, so the button can never offer a shield the engine will refuse.
+export const canBuyStreakFreeze = (prev: GameState, now: Date = new Date()): boolean => {
+  const s = prev;
+  if (s.streakFreezes >= STREAK_FREEZE_MAX) return false;
+  if (s.coins < STREAK_FREEZE_COST) return false;
+  // Nothing to protect before the first streak day.
+  if (s.currentStreak <= 0) return false;
+  // A shield is advance protection, not a cheaper retroactive repair: once a
+  // day has already been missed, only the paid repair can bring the streak back.
+  return daysBetween(s.lastFocusDate, todayKey(now)) <= 1;
+};
+
+// Buy the one streak shield. Spent automatically when it covers a missed day.
 export const buyStreakFreeze = (
   prev: GameState,
+  now: Date = new Date(),
 ): { state: GameState; ok: boolean } => {
-  const s = normalizeForToday(prev);
-  // A freeze is advance protection, not a cheaper retroactive repair: it
-  // cannot be bought once the streak has already lapsed for a day.
-  if (
-    (s.currentStreak > 0 &&
-      (activeStreak(s) === 0 || daysBetween(s.lastFocusDate, todayKey()) > 1)) ||
-    s.streakFreezes >= STREAK_FREEZE_MAX ||
-    s.coins < STREAK_FREEZE_COST
-  ) {
-    return { state: s, ok: false };
-  }
+  const s = normalizeForToday(prev, now);
+  if (!canBuyStreakFreeze(s, now)) return { state: s, ok: false };
   return {
     state: {
       ...s,
