@@ -692,17 +692,44 @@ export const recordSession = (
   };
 };
 
+// The one daily-goal rule, used by both the card and the payout. Keeping two
+// copies of "is the goal reached" is what made the UI test `completedToday`
+// (a session count) while the engine paid on `minutesToday` — a single
+// 25-minute session was payable but never offered, and fifteen one-minute
+// sessions were offered but never paid.
+export interface DailyGoalStatus {
+  minutes: number; // focused minutes counted for today (0 when rolled over)
+  target: number;
+  reached: boolean; // the goal is met today
+  claimed: boolean; // the bonus was already taken today
+  claimable: boolean; // the card should offer the claim button
+}
+
+export const dailyGoalStatus = (
+  prev: GameState,
+  now: Date = new Date(),
+): DailyGoalStatus => {
+  const s = normalizeForToday(prev, now);
+  const fresh = s.dailyProgressDate === todayKey(now);
+  const minutes = fresh ? Math.min(s.minutesToday, DAILY_GOAL) : 0;
+  const reached = fresh && s.minutesToday >= DAILY_GOAL;
+  const claimed = fresh && s.dailyGoalClaimed;
+  return {
+    minutes,
+    target: DAILY_GOAL,
+    reached,
+    claimed,
+    claimable: reached && !claimed,
+  };
+};
+
 // Claim the daily-goal bonus (once per day, after DAILY_GOAL focus minutes).
 export const claimDailyGoal = (
   prev: GameState,
   now: Date = new Date(),
 ): { state: GameState; reward: number } => {
   const s = normalizeForToday(prev, now);
-  if (
-    s.dailyProgressDate !== todayKey(now) ||
-    s.dailyGoalClaimed ||
-    s.minutesToday < DAILY_GOAL
-  ) {
+  if (!dailyGoalStatus(s, now).claimable) {
     return { state: s, reward: 0 };
   }
   return {

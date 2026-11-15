@@ -883,6 +883,44 @@ console.log('== 33. The record bonus cannot be farmed by creeping the record =='
   ok(r2.state.coins - r1.state.coins === Math.round(301 / 10), 'the session itself still pays in full');
 }
 
+console.log('== 34. Daily goal has one rule for the UI and the payout ==');
+{
+  // The UI used to test completedToday >= DAILY_GOAL while the engine paid on
+  // minutesToday >= DAILY_GOAL, so a single 25-minute session was payable but
+  // never offered, and fifteen 1-minute sessions were offered but never paid.
+  const now = new Date(2026, 8, 18, 10);
+
+  const one = gs.recordSession(base(), 1500, now).state;
+  const oneStatus = gs.dailyGoalStatus(one, now);
+  ok(oneStatus.reached && oneStatus.claimable, 'one 25-min session is claimable in the UI');
+  ok(gs.claimDailyGoal(one, now).reward === gs.DAILY_GOAL_REWARD, 'and the engine pays it');
+
+  let fifteen = base();
+  for (let i = 0; i < 15; i++) fifteen = gs.recordSession(fifteen, 60, now).state;
+  ok(fifteen.completedToday === 15 && fifteen.minutesToday === 15, '15 x 1 min = 15 sessions and 15 minutes');
+  ok(gs.dailyGoalStatus(fifteen, now).claimable, '15 one-minute sessions reach the 15-minute goal');
+  ok(gs.claimDailyGoal(fifteen, now).reward === gs.DAILY_GOAL_REWARD, 'and the engine pays it too');
+
+  // The status must agree with the payout on every state, not just these two.
+  const states = [
+    base(),
+    gs.recordSession(base(), 300, now).state,
+    gs.recordSession(base(), 1500, now).state,
+    { ...base(), minutesToday: gs.DAILY_GOAL, dailyProgressDate: gs.todayKey(now), lastFocusDate: gs.todayKey(now) },
+    { ...base(), minutesToday: gs.DAILY_GOAL - 1, dailyProgressDate: gs.todayKey(now), lastFocusDate: gs.todayKey(now) },
+    { ...base(), minutesToday: gs.DAILY_GOAL + 5, dailyGoalClaimed: true, dailyProgressDate: gs.todayKey(now) },
+    { ...base(), minutesToday: gs.DAILY_GOAL, dailyProgressDate: '2026-09-17' },
+  ];
+  for (const st of states) {
+    const status = gs.dailyGoalStatus(st, now);
+    const paid = gs.claimDailyGoal(st, now).reward > 0;
+    ok(status.claimable === paid, `status.claimable (${status.claimable}) matches payout (${paid})`);
+  }
+  // Yesterday's progress never leaks into today.
+  ok(!gs.dailyGoalStatus({ ...base(), minutesToday: 99, dailyProgressDate: '2026-09-17' }, now).reached, 'stale progress does not count as today');
+  ok(gs.dailyGoalStatus({ ...base(), minutesToday: 99, dailyProgressDate: '2026-09-17' }, now).minutes === 0, 'stale progress reads 0 minutes today');
+}
+
 console.log('== 32. Coin economy stays a long-term goal ==');
 {
   // 30 days at 25 min/day: a steady player still has things left to buy.
