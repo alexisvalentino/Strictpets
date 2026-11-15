@@ -2,41 +2,49 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { IonContent } from '@ionic/react';
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
+import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import Mascot from './Mascot';
 import ConfettiBurst from './ConfettiBurst';
+import Icon, { type IconName } from './Icon';
 import HomePage from './HomePage';
 import RewardsPage from './RewardsPage';
 import TabBar, { type TabKey } from './TabBar';
 import DevTip from './DevTip';
 import { useGameState } from '../lib/useGameState';
 import { syncStatusBar } from '../lib/statusBar';
+import { requestReminderPermission, syncStreakReminder } from '../lib/native';
 import {
-  DAILY_GOAL,
   DAILY_GOAL_REWARD,
+  MASCOT_CATALOG,
   RECORD_BONUS,
   STREAK_REPAIR_COST,
-  TREE_COST,
   activeStreak,
   awardFailConsolation,
   buyAccessory,
-  buyMascot,
   buyStreakFreeze,
   buyTheme,
+  canBuyStreakFreeze,
   canRepairStreak,
+  clampCustomDuration,
+  claimableCheckinDay,
   claimDailyBonus,
   claimDayReward,
   claimDailyGoal,
   clearSessionRunning,
   consumeInterruptedSession,
   dailyBonusValue,
+  dailyGoalStatus,
   daysBetween,
-  donateToForest,
   equipAccessory,
   equipMascot,
   equipTheme,
   isWeekend,
   markSessionRunning,
+  nextPetGoal,
+  petRemainingText,
+  recentFocusDays,
+  recordFailedAttempt,
   recordSession,
   repairStreak,
   todayKey,
@@ -130,7 +138,7 @@ const playSuccessSound = () => {
   playTone(880, 0.18, 0.34); // A5 — rising "you win" chime
 };
 
-// Triumphant fanfare for milestones (new record / tree planted): a rising
+// Triumphant fanfare for milestones (new record / new friend): a rising
 // C-E-G-C arpeggio with a high sparkle, layered after the base chime.
 const playCelebrationSound = () => {
   playTone(523.25, 0.55, 0.12, 'sine', 0.22); // C5
@@ -182,17 +190,23 @@ const FocusTracker = () => {
   const [customMin, setCustomMin] = useState('');
   const [customSec, setCustomSec] = useState('');
   const { game, gameRef, update } = useGameState();
+  const petName =
+    MASCOT_CATALOG.find(m => m.id === game.activeMascot)?.name ?? 'Your pet';
+  const nextPet = nextPetGoal(game);
   const [lastCoinsEarned, setLastCoinsEarned] = useState(0);
   const [lastFreezeUsed, setLastFreezeUsed] = useState(0);
   const [lastWeekendBonus, setLastWeekendBonus] = useState(false);
   const [lastNewRecord, setLastNewRecord] = useState(false);
-  const [lastTreesPlanted, setLastTreesPlanted] = useState(0);
-  const [bubblePopped, setBubblePopped] = useState(false);
-  const [popText, setPopText] = useState<string | null>(null);
+  const [lastNewPets, setLastNewPets] = useState<MascotId[]>([]);
+  const [popText, setPopText] = useState<{ text: string; icon: IconName } | null>(null);
   const [failResult, setFailResult] = useState<{
     seconds: number;
     reward: number;
   } | null>(null);
+  const [failedStreak, setFailedStreak] = useState(false);
+  const [repairPromptOpen, setRepairPromptOpen] = useState(false);
+  // Bumped after the notification permission prompt so the reminder resyncs.
+  const [reminderNonce, setReminderNonce] = useState(0);
 
   // Swipeable pages + bottom tab bar. The tracker (focus) tab is the default.
   const carouselRef = useRef<HTMLDivElement>(null);
@@ -259,12 +273,13 @@ const FocusTracker = () => {
       phaseRef.current = 'failed';
       setFailReason('interrupted');
       setPhase('failed');
+      // A reload is an abandoned session too: it counts as today's attempt,
+      // exactly like a touch failure (no streak banking by reloading).
+      const failed = recordFailedAttempt(gameRef.current);
+      update(() => failed.state);
+      setFailedStreak(failed.lostStreak);
     }
-  }, []);
-
-  useEffect(() => {
-    if (game.dailyProgressDate === todayKey()) setBubblePopped(false);
-  }, [game.dailyProgressDate]);
+  }, [gameRef, update]);
 
   useEffect(() => () => window.clearTimeout(popTimerRef.current), []);
 
@@ -279,6 +294,20 @@ const FocusTracker = () => {
   useEffect(() => {
     syncStatusBar();
   }, [game.activeTheme]);
+
+  // Keep exactly one gentle evening reminder scheduled for the current streak
+  // (native only). Re-run whenever something that changes the plan changes.
+  useEffect(() => {
+    void syncStreakReminder(gameRef.current, petName);
+  }, [
+    game.lastFocusDate,
+    game.currentStreak,
+    game.streakFreezes,
+    game.dailyProgressDate,
+    petName,
+    reminderNonce,
+    gameRef,
+  ]);
 
   const failSession = useCallback(
     (reason: FailReason) => {
@@ -295,7 +324,11 @@ const FocusTracker = () => {
       // how long you resisted, but far less than completing it would have.
       const seconds = Math.floor(sessionMs / 1000);
       const { state, reward } = awardFailConsolation(gameRef.current, seconds);
-      if (reward > 0) update(() => state);
+      // Failing still uses up the day: the streak cannot be banked for free
+      // by giving up on purpose and trying again tomorrow.
+      const failed = recordFailedAttempt(state);
+      update(() => failed.state);
+      setFailedStreak(failed.lostStreak);
       setFailResult({ seconds, reward });
       setFailReason(reason);
       setElapsed(0);
@@ -351,6 +384,30 @@ const FocusTracker = () => {
       if (removeListener) void removeListener();
     };
   }, [failSession]);
+
+  // --- Android hardware back ---
+  // Without a handler the hardware back button closes the app from any screen,
+  // which reads as a crash three taps deep in Rewards. Return to the default tab
+  // first; leave the app only from there.
+  useEffect(() => {
+    if (Capacitor.getPlatform() !== 'android') return;
+    let disposed = false;
+    let removeListener: (() => Promise<void>) | undefined;
+    void App.addListener('backButton', () => {
+      if (activeTab !== 'focus') {
+        setActiveTab('focus');
+        return;
+      }
+      void App.exitApp();
+    }).then(handle => {
+      if (disposed) void handle.remove();
+      else removeListener = () => handle.remove();
+    });
+    return () => {
+      disposed = true;
+      if (removeListener) void removeListener();
+    };
+  }, [activeTab]);
 
   // --- Movement detection (DeviceMotion API / accelerometer + gyroscope) ---
   // Fires natively in Android WebView; on iOS it only starts after the user
@@ -427,12 +484,14 @@ const FocusTracker = () => {
           setLastFreezeUsed(result.freezeUsed);
           setLastWeekendBonus(result.weekendBonus);
           setLastNewRecord(result.newRecord);
-          setLastTreesPlanted(result.treesPlanted);
+          setLastNewPets(result.newPets);
           // Big milestones get the fanfare + stronger haptic on top.
-          if (result.newRecord || result.treesPlanted > 0) {
+          if (result.newRecord || result.newPets.length > 0) {
             playCelebrationSound();
             hapticCelebration();
           }
+          // A finished session is the natural moment to offer reminders.
+          void requestReminderPermission().then(() => setReminderNonce(n => n + 1));
         }
         setPhase('done');
       } else {
@@ -444,20 +503,23 @@ const FocusTracker = () => {
 
   // Custom duration: clamp to 10s – 4h, then keep the previous goal if invalid.
   const applyCustom = () => {
-    const m = Math.max(0, Math.min(240, parseInt(customMin || '0', 10) || 0));
-    const s = Math.max(0, Math.min(59, parseInt(customSec || '0', 10) || 0));
-    const total = m * 60 + s;
     setCustomOpen(false);
-    if (total < 10) return;
+    const total = clampCustomDuration(
+      parseInt(customMin || '0', 10),
+      parseInt(customSec || '0', 10),
+    );
+    if (total === null) return;
     setDuration(total);
-    setCustomMin(String(m));
-    setCustomSec(String(s));
+    // Reflect the clamped goal back into the editor (e.g. 240:59 -> 240:00).
+    setCustomMin(String(Math.floor(total / 60)));
+    setCustomSec(String(total % 60));
   };
 
   const start = () => {
     markSessionRunning();
     setElapsed(0);
     setFailResult(null);
+    setFailedStreak(false);
     lastTouchHandledAtRef.current = 0;
     sessionStartMonotonicRef.current = performance.now();
     phaseRef.current = 'running';
@@ -475,18 +537,17 @@ const FocusTracker = () => {
     setPhase('idle');
   };
 
-  const showPop = (text: string) => {
+  const showPop = (text: string, icon: IconName = 'coin') => {
     window.clearTimeout(popTimerRef.current);
-    setPopText(text);
+    setPopText({ text, icon });
     popTimerRef.current = window.setTimeout(() => setPopText(null), 1400);
   };
 
   const collectBubble = () => {
-    if (bubblePopped) return;
-    setBubblePopped(true);
     const { state, reward } = claimDailyBonus(gameRef.current);
+    if (reward === 0) return;
     update(() => state);
-    showPop(`+${reward} 🪙`);
+    showPop(`+${reward} coins`, 'coin');
     playCollectSound();
     hapticCollect();
   };
@@ -495,7 +556,7 @@ const FocusTracker = () => {
     const { state, reward } = claimDailyGoal(gameRef.current);
     if (reward === 0) return;
     update(() => state);
-    showPop(`+${reward} 🪙`);
+    showPop(`+${reward} coins`, 'coin');
     playCollectSound();
     hapticCollect();
   };
@@ -504,34 +565,46 @@ const FocusTracker = () => {
     const { state, reward } = claimDayReward(gameRef.current, day);
     if (reward === 0) return;
     update(() => state);
-    showPop(`Day ${day} reward +${reward} 🪙`);
+    showPop(`Day ${day} reward +${reward} coins`, 'calendar');
     playCollectSound();
     hapticCollect();
   };
 
   const repairStreakHandler = () => {
     const { state, repaired } = repairStreak(gameRef.current);
-    if (!repaired) return;
+    if (!repaired) return false;
     update(() => state);
-    showPop('Streak repaired 🔥');
+    showPop('Streak repaired', 'flame');
     playCollectSound();
     hapticCollect();
+    return true;
   };
 
-  const buyMascotHandler = (id: MascotId) => {
-    const { state, ok } = buyMascot(gameRef.current, id);
-    if (!ok) return;
-    update(() => state);
-    showPop('New mascot unlocked 🎉');
-    playCollectSound();
-    hapticCollect();
+  // Starting a session in the repair window would silently restart the
+  // streak at Day 1, so offer the repair first.
+  const onStartPressed = () => {
+    if (canRepairStreak(gameRef.current)) {
+      setRepairPromptOpen(true);
+      return;
+    }
+    start();
+  };
+
+  const repairAndStart = () => {
+    setRepairPromptOpen(false);
+    if (repairStreakHandler()) start();
+  };
+
+  const startWithoutRepair = () => {
+    setRepairPromptOpen(false);
+    start();
   };
 
   const equipMascotHandler = (id: MascotId) => {
     const { state, ok } = equipMascot(gameRef.current, id);
     if (!ok) return;
     update(() => state);
-    showPop('Mascot equipped');
+    showPop(`${MASCOT_CATALOG.find(m => m.id === id)?.name ?? 'Your pet'} is with you now`, 'paw');
     hapticCollect();
   };
 
@@ -539,7 +612,7 @@ const FocusTracker = () => {
     const { state, ok } = buyAccessory(gameRef.current, id);
     if (!ok) return;
     update(() => state);
-    showPop('Accessory unlocked 🎀');
+    showPop('Accessory unlocked', 'ribbon');
     playCollectSound();
     hapticCollect();
   };
@@ -556,19 +629,7 @@ const FocusTracker = () => {
     const { state, ok } = buyStreakFreeze(gameRef.current);
     if (!ok) return;
     update(() => state);
-    showPop('Streak freeze added 🛡️');
-    playCollectSound();
-    hapticCollect();
-  };
-
-  const donateHandler = () => {
-    const { state, treesPlanted, donated } = donateToForest(
-      gameRef.current,
-      TREE_COST,
-    );
-    if (donated <= 0) return;
-    update(() => state);
-    showPop(treesPlanted > 0 ? 'Tree planted 🌳' : `+${donated} 🪙 donated`);
+    showPop('Streak freeze added', 'freeze');
     playCollectSound();
     hapticCollect();
   };
@@ -577,7 +638,7 @@ const FocusTracker = () => {
     const { state, ok } = buyTheme(gameRef.current, id);
     if (!ok) return;
     update(() => state);
-    showPop('Theme unlocked 🎨');
+    showPop('Theme unlocked', 'palette');
     playCollectSound();
     hapticCollect();
   };
@@ -591,15 +652,19 @@ const FocusTracker = () => {
   };
 
   const progress = Math.min(100, (elapsed / duration) * 100);
-  const dailyGoalReached =
-    game.dailyProgressDate === todayKey() &&
-    !game.dailyGoalClaimed &&
-    game.completedToday >= DAILY_GOAL;
-  const bonusAge = game.dailyBonusDate
-    ? daysBetween(game.dailyBonusDate, todayKey())
-    : Infinity;
-  const bubbleVisible = !bubblePopped && bonusAge > 0;
+  // Engine rule — the card, the completion message, the badge, and the payout
+  // all read the same helper, so they cannot disagree.
+  const goal = dailyGoalStatus(game);
+  const dailyGoalReached = goal.claimable;
+  // The engine's dailyBonusDate is the only record of whether today's gift is
+  // still unclaimed; a second `bubblePopped` flag could drift out of sync.
+  const bonusAvailable =
+    game.dailyBonusDate === null ||
+    daysBetween(game.dailyBonusDate, todayKey()) > 0;
   const weekend = isWeekend();
+  // Engine rule — the strip, the badge, and the claim all agree.
+  const claimableDay = claimableCheckinDay(game);
+  const rewardsBadge = claimableDay !== null || dailyGoalReached || bonusAvailable;
 
   return (
     <IonContent
@@ -618,9 +683,70 @@ const FocusTracker = () => {
             aria-live="polite"
             className="pointer-events-none absolute inset-x-0 top-3 z-30 flex justify-center"
           >
-            <span className="animate-bounce rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-black text-emerald-600 shadow-sm">
-              {popText}
+            <span className="flex animate-bounce items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-black text-emerald-600 shadow-sm">
+              <Icon name={popText.icon} size={14} tone="inherit" />
+              {popText.text}
             </span>
+          </div>
+        )}
+
+        {/* repair-before-start prompt (only in the one-day repair window) */}
+        {repairPromptOpen && (
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-slate-900/40 px-6">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="repair-prompt-title"
+              className="w-full max-w-sm rounded-3xl bg-white p-5 text-center shadow-xl"
+            >
+              <Mascot
+                mood="idle"
+                variant={game.activeMascot}
+                accessory={game.equippedAccessory}
+                className="mx-auto mb-3 h-20 w-20"
+              />
+              <h2 id="repair-prompt-title" className="flex items-center justify-center gap-1.5 text-lg font-black text-slate-900">
+                {petName} missed you yesterday
+                <Icon name="paw" size={16} className="text-slate-400" />
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                Repair your {game.currentStreak}-day streak before you start?
+                Otherwise it begins again from Day 1.
+              </p>
+              <button
+                onClick={repairAndStart}
+                disabled={game.coins < STREAK_REPAIR_COST}
+                className={`mt-5 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-2xl py-3 text-sm font-black uppercase tracking-wide transition-transform active:scale-95 ${
+                  game.coins >= STREAK_REPAIR_COST
+                    ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-white shadow-md shadow-amber-500/30'
+                    : 'cursor-not-allowed bg-slate-100 text-slate-400'
+                }`}
+              >
+                {game.coins >= STREAK_REPAIR_COST ? (
+                  <>
+                    Repair for <span className="tabular-nums">{STREAK_REPAIR_COST}</span>
+                    <Icon name="coin" size={14} /> &amp; start
+                  </>
+                ) : (
+                  <>
+                    Repair needs <span className="tabular-nums">{STREAK_REPAIR_COST}</span>
+                    <Icon name="coin" size={14} /> (you have {game.coins})
+                  </>
+                )}
+              </button>
+              <button
+                onClick={startWithoutRepair}
+                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white py-3 text-sm font-black uppercase tracking-wide text-slate-600 transition-transform active:scale-95"
+              >
+                Start a new streak
+              </button>
+              <button
+                onClick={() => setRepairPromptOpen(false)}
+                className="mt-2 w-full py-2 text-xs font-bold text-slate-400"
+              >
+                Not now
+              </button>
+            </div>
           </div>
         )}
 
@@ -628,38 +754,34 @@ const FocusTracker = () => {
         <div
           ref={carouselRef}
           onScroll={onCarouselScroll}
-          className={`no-scrollbar flex flex-1 snap-x snap-mandatory ${
+          className={`no-scrollbar flex flex-1 snap-x snap-mandatory md:snap-none ${
             phase === 'idle' ? 'overflow-x-auto' : 'overflow-x-hidden'
           }`}
         >
           <HomePage
             streak={activeStreak(game)}
-            repairableStreak={game.currentStreak}
-            coins={game.coins}
             bestStreak={game.bestStreak}
-            completedToday={game.completedToday}
-            repairCost={canRepairStreak(game) ? STREAK_REPAIR_COST : null}
+            nextPet={nextPet}
+            ownedPetCount={game.ownedMascots.length}
+            week={recentFocusDays(game, 7)}
+            coins={game.coins}
+            minutesToday={goal.minutes}
+            dailyGoalClaimed={goal.claimed}
+            shields={game.streakFreezes}
+            repairableStreak={canRepairStreak(game) ? game.currentStreak : 0}
+            canBuyShield={canBuyStreakFreeze(game)}
             mascot={game.activeMascot}
             accessory={game.equippedAccessory}
-            streakFreezes={game.streakFreezes}
-            canBuyFreeze={game.currentStreak === 0 || activeStreak(game) > 0}
-            trees={game.trees}
-            treeProgress={game.treeProgress}
-            treePlantedDay={game.treePlantedDay}
-            treePlantedSession={game.treePlantedSession}
+            petName={petName}
             totalSessions={game.totalSessions}
-            forestFocusMinutes={game.forestFocusMinutes}
-            forestDonated={game.forestDonated}
-            weekend={weekend}
-            active={activeTab === 'home'}
+            focusSeconds={game.focusSeconds}
             onRepair={repairStreakHandler}
-            onBuyFreeze={buyFreezeHandler}
-            onDonate={donateHandler}
+            onBuyShield={buyFreezeHandler}
+            onOpenRewards={() => scrollToTab('rewards')}
           />
 
           {/* Focus page — the tracker, the priority */}
-          <div className="flex h-full w-full shrink-0 snap-start flex-col overflow-y-auto">
-            <div className="my-auto w-full max-w-md px-6 py-6">
+          <div className="flex h-full w-full shrink-0 snap-start flex-col overflow-y-auto">            <div className="my-auto mx-auto w-full max-w-md px-4 py-6 pl-[max(1rem,var(--safe-area-left))] pr-[max(1rem,var(--safe-area-right))] sm:px-6 md:max-w-lg lg:max-w-2xl">
               {phase !== 'idle' && (
                 <div className="mb-10 text-center">
                   <h1 className="text-sm font-black uppercase tracking-[0.35em] text-brand-600">
@@ -671,11 +793,13 @@ const FocusTracker = () => {
               {phase === 'idle' && (
                 <div className="text-center">
                   <div className="mb-5 flex items-center justify-center gap-2">
-                    <span className="rounded-full border border-amber-200 bg-white/80 px-3 py-1 text-xs font-bold text-amber-500 shadow-sm">
-                      🔥 {activeStreak(game)} day{activeStreak(game) === 1 ? '' : 's'}
+                    <span className="flex items-center gap-1 rounded-full border border-amber-200 bg-white/80 px-3 py-1 text-xs font-bold text-amber-500 shadow-sm">
+                      <Icon name="flame" size={13} />
+                      {activeStreak(game)} day{activeStreak(game) === 1 ? '' : 's'}
                     </span>
-                    <span className="rounded-full border border-sky-100 bg-white/80 px-3 py-1 text-xs font-bold text-brand-600 shadow-sm">
-                      🪙 {game.coins}
+                    <span className="flex items-center gap-1 rounded-full border border-sky-100 bg-white/80 px-3 py-1 text-xs font-bold tabular-nums text-brand-600 shadow-sm">
+                      <Icon name="coin" size={13} />
+                      {game.coins}
                     </span>
                   </div>
 
@@ -688,12 +812,13 @@ const FocusTracker = () => {
                       className="mx-auto mb-4 h-28 w-28"
                     />
 
-                    <h2 className="text-xl font-black leading-snug text-slate-900">
-                      You are geh if you didn&apos;t pass this.
+                    <h2 className="flex flex-wrap items-center justify-center gap-x-1.5 text-xl font-black leading-snug text-slate-900">
+                      {petName} is ready to focus with you
+                      <Icon name="paw" size={17} className="text-slate-300" />
                     </h2>
                     <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                      Pick a goal, press start, then put the phone down. Any
-                      touch or movement resets your progress back to zero.
+                      Pick a goal, press start, then set the phone down. A tap
+                      or a bump wakes {petName} up and the timer starts over.
                     </p>
                     <div className="mt-6 grid grid-cols-4 gap-2">
                       {DURATIONS.map(d => (
@@ -703,7 +828,7 @@ const FocusTracker = () => {
                             setDuration(d.seconds);
                             setCustomOpen(false);
                           }}
-                          className={`rounded-xl py-2.5 text-xs font-bold transition-all ${
+                          className={`min-h-11 rounded-xl py-2.5 text-xs font-bold transition-all ${
                             duration === d.seconds
                               ? 'bg-brand-600 text-white shadow-sm'
                               : 'border border-slate-200 bg-white text-slate-600 shadow-sm active:scale-95'
@@ -741,16 +866,16 @@ const FocusTracker = () => {
                           />
                           <button
                             onClick={applyCustom}
-                            className="flex-1 rounded-lg bg-brand-600 py-2 text-xs font-black uppercase tracking-wide text-white transition-transform active:scale-95"
+                            className="flex-1 min-h-11 rounded-lg bg-brand-600 py-2 text-xs font-black uppercase tracking-wide text-white transition-transform active:scale-95"
                           >
                             Set
                           </button>
                           <button
                             onClick={() => setCustomOpen(false)}
                             aria-label="Cancel custom duration"
-                            className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold text-slate-500 active:scale-95"
+                            className="flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold text-slate-500 active:scale-95"
                           >
-                            ✕
+                            <Icon name="close" size={14} />
                           </button>
                         </div>
                         <p className="mt-1.5 text-[10px] font-semibold text-slate-400">
@@ -767,7 +892,7 @@ const FocusTracker = () => {
                             setCustomSec(String(duration % 60));
                           }
                         }}
-                        className={`mt-2 w-full rounded-xl border border-dashed py-2.5 text-xs font-bold transition-all ${
+                        className={`mt-2 min-h-11 w-full rounded-xl border border-dashed py-2.5 text-xs font-bold transition-all ${
                           !DURATIONS.some(d => d.seconds === duration)
                             ? 'border-brand-400 bg-brand-50 text-brand-600'
                             : 'border-slate-300 bg-white/60 text-slate-500 active:scale-[0.99]'
@@ -780,7 +905,7 @@ const FocusTracker = () => {
                     )}
 
                     <button
-                      onClick={start}
+                      onClick={onStartPressed}
                       className="mt-5 w-full rounded-2xl bg-gradient-to-r from-sky-500 to-brand-600 py-4 text-lg font-black tracking-wide text-white shadow-lg shadow-brand-600/30 transition-transform active:scale-95"
                     >
                       START FOCUS
@@ -850,13 +975,13 @@ const FocusTracker = () => {
                   </div>
 
                   <p className="mt-8 text-2xl font-bold text-slate-800">
-                    You are geh if you touch your phone.
+                    Shh… {petName} is focusing with you.
                   </p>
                   <p className="mt-2 text-sm font-semibold text-amber-500">
-                    Don&apos;t touch it unless the time is finished.
+                    Leave the phone resting until the timer finishes.
                   </p>
                   <p className="mt-4 text-xs text-slate-500">
-                    Any touch or movement sends you back to 00:00.
+                    A tap or a bump will wake {petName} and restart the timer.
                   </p>
                 </div>
               )}
@@ -869,40 +994,37 @@ const FocusTracker = () => {
                     accessory={game.equippedAccessory}
                     className="mx-auto mb-6 h-28 w-28"
                   />
-                  <p className="mb-4 text-2xl font-black tabular-nums text-red-500/70">
-                    00:00
-                  </p>
-                  <h2 className="animate-shake select-none text-[17vw] font-black leading-[0.85] tracking-tight text-red-500">
-                    <span className="block">YOU ARE</span>
-                    <span className="block">GEH</span>
+                  <h2 className="select-none text-4xl font-black leading-tight text-amber-500">
+                    That&apos;s okay!
                   </h2>
-                  <p className="mt-8 text-xl font-bold text-red-500">
+                  <p className="mt-6 text-xl font-bold text-slate-700">
                     {failReason === 'touch'
-                      ? 'You touched your phone.'
+                      ? `A tap woke ${petName} up.`
                       : failReason === 'moved'
-                        ? 'You moved the phone.'
+                        ? `A bump woke ${petName} up.`
                         : failReason === 'interrupted'
-                          ? 'Your session was interrupted.'
-                        : 'You left the app.'}
+                          ? 'The app closed during your session.'
+                        : `${petName} noticed you left the app.`}
                   </p>
                   <p className="mt-2 text-sm text-slate-500">
-                    {failReason === 'touch'
-                      ? 'Back to zero. Touching means starting over.'
-                      : failReason === 'moved'
-                        ? 'Back to zero. Moving means starting over.'
-                        : failReason === 'interrupted'
-                          ? 'Back to zero. A reloaded session cannot be verified.'
-                        : 'Back to zero. Leaving means starting over.'}
+                    {failReason === 'interrupted'
+                      ? `Sessions can't continue after a restart. ${petName} is ready when you are.`
+                      : `Every try builds the habit. ${petName} is ready for another round.`}
                   </p>
+                  {failedStreak && (
+                    <p className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700">
+                      Your streak paused here. {petName} will be waiting
+                      tomorrow — a short session restarts it.
+                    </p>
+                  )}
                   {failResult && failResult.reward > 0 && (
                     <p className="mt-3 inline-block rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-600">
-                      Survived {failResult.seconds}s · +{failResult.reward} 🪙
-                      consolation
+                      You focused for {failResult.seconds}s · +{failResult.reward} coins
                     </p>
                   )}
                   <button
                     onClick={reset}
-                    className="mt-10 w-full rounded-2xl bg-gradient-to-r from-red-500 to-red-600 py-4 text-lg font-black tracking-wide text-white shadow-lg shadow-red-500/30 transition-transform active:scale-95"
+                    className="mt-10 w-full rounded-2xl bg-gradient-to-r from-sky-500 to-brand-600 py-4 text-lg font-black tracking-wide text-white shadow-lg shadow-brand-600/30 transition-transform active:scale-95"
                   >
                     TRY AGAIN
                   </button>
@@ -911,7 +1033,7 @@ const FocusTracker = () => {
 
               {phase === 'done' && (
                 <div className="relative text-center" role="status" aria-live="polite">
-                  {(lastNewRecord || lastTreesPlanted > 0) && <ConfettiBurst />}
+                  {(lastNewRecord || lastNewPets.length > 0) && <ConfettiBurst />}
                   <Mascot
                     mood="happy"
                     variant={game.activeMascot}
@@ -921,41 +1043,74 @@ const FocusTracker = () => {
                   <div className="text-7xl font-black tabular-nums text-emerald-500">
                     {formatTime(duration)}
                   </div>
-                  <p className="mt-8 text-2xl font-bold text-emerald-600">
-                    Time&apos;s up. You didn&apos;t touch it.
+                  <p className="mt-8 flex items-center justify-center gap-2 text-2xl font-bold text-emerald-600">
+                    You did it!
+                    <Icon name="sparkle" size={22} />
                   </p>
-                  <p className="mt-2 text-sm text-slate-500">
-                    You passed. Not geh today. 🏆
+                  <p className="mt-2 flex items-center justify-center gap-1.5 text-sm text-slate-500">
+                    {petName} is so proud of you.
+                    <Icon name="paw" size={13} className="text-slate-300" />
                   </p>
                   <p className="mt-2 text-sm font-bold text-slate-600">
-                    +{lastCoinsEarned} 🪙 · {activeStreak(game)}-day streak 🔥
+                    +{lastCoinsEarned} coins · {activeStreak(game)}-day streak
                   </p>
                   {lastFreezeUsed > 0 && (
                     <p className="mt-1 text-xs font-black text-sky-600">
-                      🛡️ Freeze saved your streak!
+                      Freeze saved your streak!
                     </p>
                   )}
                   {lastWeekendBonus && (
                     <p className="mt-1 text-xs font-black text-fuchsia-600">
-                      ✖️2 Weekend double points!
+                      2× Weekend double points!
                     </p>
                   )}
                   {lastNewRecord && (
                     <p className="mt-1 text-xs font-black text-amber-600">
-                      🏆 New longest session! +{RECORD_BONUS} 🪙
+                      New longest session! +{RECORD_BONUS} coins
                     </p>
                   )}
-                  {lastTreesPlanted > 0 && (
-                    <p className="mt-1 text-xs font-black text-emerald-600">
-                      🌳 +{lastTreesPlanted} tree{lastTreesPlanted === 1 ? '' : 's'} planted!
-                    </p>
-                  )}
+                  {/* `dailyGoalReached` means claimable, so this never promises
+                      coins that are already banked or not yet earned. */}
                   {dailyGoalReached && (
                     <p className="mt-1 text-xs font-semibold text-emerald-600">
-                      Daily goal reached! Claim +{DAILY_GOAL_REWARD} 🪙 on the
+                      Daily goal reached! Claim +{DAILY_GOAL_REWARD} coins on the
                       Rewards tab
                     </p>
                   )}
+
+                  {/* new friends met this session */}
+                  {lastNewPets.length > 0 ? (
+                    <div className="mt-5 rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-50 to-white p-3">
+                      <p className="text-xs font-black uppercase tracking-widest text-amber-600">
+                        New friend{lastNewPets.length === 1 ? '' : 's'} unlocked!
+                      </p>
+                      <div className="mt-2 flex flex-wrap justify-center gap-3">
+                        {lastNewPets.map(id => {
+                          const pet = MASCOT_CATALOG.find(p => p.id === id);
+                          return (
+                            <div key={id} className="flex w-20 flex-col items-center">
+                              <Mascot mood="happy" variant={id} still className="h-14 w-14" />
+                              <p className="mt-1 text-[11px] font-black text-slate-700">{pet?.name}</p>
+                              {game.activeMascot !== id && (
+                                <button
+                                  onClick={() => equipMascotHandler(id)}
+                                  className="mt-1 rounded-lg border border-brand-400 bg-white px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-brand-600 transition-transform active:scale-95"
+                                >
+                                  Focus together
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : nextPet ? (
+                    <p className="mt-4 text-xs font-semibold text-slate-500">
+                      Next friend: <span className="font-black text-slate-700">{nextPet.name}</span>
+                      {' · '}
+                      {petRemainingText(game, nextPet)}
+                    </p>
+                  ) : null}
                   <button
                     onClick={reset}
                     className="mt-10 w-full rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 py-4 text-lg font-black tracking-wide text-white shadow-lg shadow-emerald-500/30 transition-transform active:scale-95"
@@ -970,9 +1125,9 @@ const FocusTracker = () => {
           <RewardsPage
             coins={game.coins}
             currentStreak={activeStreak(game)}
-            completedToday={game.completedToday}
+            minutesToday={goal.minutes}
             dailyGoalReached={dailyGoalReached}
-            dailyGoalClaimed={game.dailyGoalClaimed}
+            dailyGoalClaimed={goal.claimed}
             claimedDays={game.claimedDays}
             ownedMascots={game.ownedMascots}
             activeMascot={game.activeMascot}
@@ -982,17 +1137,15 @@ const FocusTracker = () => {
             activeTheme={game.activeTheme}
             longestSession={game.longestSession}
             bestStreak={game.bestStreak}
-            trees={game.trees}
             jackpots={game.jackpots}
             totalSessions={game.totalSessions}
-            lastFocusDate={game.lastFocusDate}
-            lastCheckinDate={game.lastCheckinDate}
-            bubbleVisible={bubbleVisible}
-            bubbleValue={dailyBonusValue()}
-            onCollectBubble={collectBubble}
+            focusSeconds={game.focusSeconds}
+            claimableDay={claimableDay}
+            bonusAvailable={bonusAvailable}
+            bonusValue={dailyBonusValue()}
+            onCollectBonus={collectBubble}
             onClaimGoal={claimGoal}
             onClaimDay={claimDay}
-            onBuyMascot={buyMascotHandler}
             onEquipMascot={equipMascotHandler}
             onBuyAccessory={buyAccessoryHandler}
             onEquipAccessory={equipAccessoryHandler}
@@ -1006,6 +1159,7 @@ const FocusTracker = () => {
           active={activeTab}
           onChange={scrollToTab}
           disabled={phase !== 'idle'}
+          badges={{ rewards: rewardsBadge && activeTab !== 'rewards' }}
         />
 
         {/* occasional dev tip — Buy me a coffee (random, dismissible) */}

@@ -1,18 +1,17 @@
 'use client';
+import { useState } from 'react';
+import Icon from './Icon';
 import {
   DAILY_GOAL,
   DAILY_GOAL_REWARD,
   DAY_REWARDS,
   checkinMultiplier,
   checkinReward,
-  todayKey,
-  daysBetween,
   type AccessoryId,
   type MascotId,
   type ThemeId,
 } from '../lib/gameState';
-import { useCountUp } from '../lib/useCountUp';
-import MascotShop from './MascotShop';
+import PetCollection from './PetCollection';
 import AccessoryShop from './AccessoryShop';
 import ThemeShop from './ThemeShop';
 import AchievementsCard from './AchievementsCard';
@@ -20,7 +19,7 @@ import AchievementsCard from './AchievementsCard';
 interface RewardsPageProps {
   coins: number;
   currentStreak: number;
-  completedToday: number;
+  minutesToday: number; // focused minutes today — the daily goal measures this
   dailyGoalReached: boolean;
   dailyGoalClaimed: boolean;
   claimedDays: number[];
@@ -32,17 +31,15 @@ interface RewardsPageProps {
   activeTheme: ThemeId;
   longestSession: number;
   bestStreak: number;
-  trees: number;
   jackpots: number;
   totalSessions: number;
-  lastFocusDate: string | null;
-  lastCheckinDate: string | null;
-  bubbleVisible: boolean;
-  bubbleValue: number;
-  onCollectBubble: () => void;
+  focusSeconds: number; // lifetime focused seconds (pet unlocks)
+  claimableDay: number | null; // from claimableCheckinDay — the engine's rule
+  bonusAvailable: boolean; // today's gift is still unclaimed
+  bonusValue: number;
+  onCollectBonus: () => void;
   onClaimGoal: () => void;
   onClaimDay: (day: number) => void;
-  onBuyMascot: (id: MascotId) => void;
   onEquipMascot: (id: MascotId) => void;
   onBuyAccessory: (id: AccessoryId) => void;
   onEquipAccessory: (id: AccessoryId | null) => void;
@@ -50,14 +47,25 @@ interface RewardsPageProps {
   onEquipTheme: (id: ThemeId) => void;
 }
 
-// Render the check-in multiplier without trailing zeros (×1, ×1.5, ×2.5…).
+// Render the check-in multiplier without trailing zeros (x1, x1.5, x2.5...).
 const formatMult = (m: number): string =>
   (m % 1 === 0 ? m.toFixed(0) : m.toFixed(1)).replace('.0', '');
+
+// Shops and the collection are different kinds of thing, so they are two tabs
+// rather than a single scroll that mixed a wallet, two shops, 22 pets and 18
+// badges into one strip. Claiming is the reason people open this page, so it
+// leads, and everything else is one tap away.
+type RewardsTab = 'claim' | 'collect';
+
+const TABS: { key: RewardsTab; label: string; icon: 'gift' | 'paw' }[] = [
+  { key: 'claim', label: 'Claim', icon: 'gift' },
+  { key: 'collect', label: 'Collect', icon: 'paw' },
+];
 
 const RewardsPage = ({
   coins,
   currentStreak,
-  completedToday,
+  minutesToday,
   dailyGoalReached,
   dailyGoalClaimed,
   claimedDays,
@@ -69,243 +77,315 @@ const RewardsPage = ({
   activeTheme,
   longestSession,
   bestStreak,
-  trees,
   jackpots,
   totalSessions,
-  lastFocusDate,
-  lastCheckinDate,
-  bubbleVisible,
-  bubbleValue,
-  onCollectBubble,
+  focusSeconds,
+  claimableDay,
+  bonusAvailable,
+  bonusValue,
+  onCollectBonus,
   onClaimGoal,
   onClaimDay,
-  onBuyMascot,
   onEquipMascot,
   onBuyAccessory,
   onEquipAccessory,
   onBuyTheme,
   onEquipTheme,
 }: RewardsPageProps) => {
-  const [coinCount, coinBump] = useCountUp(coins);
+  const [tab, setTab] = useState<RewardsTab>('claim');
+
+  const goalPct = Math.min(100, (minutesToday / DAILY_GOAL) * 100);
+  const mult = checkinMultiplier(jackpots);
 
   return (
     <div className="flex h-full w-full shrink-0 snap-start flex-col overflow-y-auto">
       <style>{`
         @keyframes rw-pop {
-          0% { transform: scale(0.4); }
-          60% { transform: scale(1.2); }
+          0%   { transform: scale(0.4); }
+          60%  { transform: scale(1.2); }
           100% { transform: scale(1); }
         }
         .rw-pop { animation: rw-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
       `}</style>
 
-      <div className="my-auto w-full max-w-md px-6 py-6">
-        <h1 className="text-sm font-black uppercase tracking-[0.35em] text-brand-600">
-          Rewards
-        </h1>
-
-        {/* coin wallet hero */}
-        <div className="relative mt-4 overflow-hidden rounded-2xl bg-gradient-to-br from-brand-600 via-sky-500 to-sky-400 p-4 text-white shadow-lg shadow-brand-500/25">
-          <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/15" />
-          <div className="absolute -bottom-10 -left-6 h-24 w-24 rounded-full bg-white/10" />
-          <div className="absolute right-14 bottom-8 h-2 w-2 rounded-full bg-white/25" />
-          <div className="relative flex items-center justify-between gap-2">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-white/75">
-                Coin Wallet
-              </p>
-              <p className="mt-1 text-3xl font-black tabular-nums drop-shadow-sm">
-                <span key={coinBump} className="stat-pop inline-block">
-                  🪙 {coinCount}
-                </span>
-              </p>
-            </div>
-            <div className="text-right">
-              <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-white/20 px-2.5 py-1 text-[10px] font-black backdrop-blur-sm">
-                🔥 {currentStreak}-day streak
-              </span>
-              <p className="mt-1.5 text-[10px] font-semibold text-white/75">
-                Keep the chain alive
-              </p>
-            </div>
-          </div>
+      <div className="my-auto mx-auto w-full max-w-md px-4 py-6 pl-[max(1rem,var(--safe-area-left))] pr-[max(1rem,var(--safe-area-right))] sm:px-6 md:max-w-3xl lg:max-w-4xl">
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-sm font-black uppercase tracking-[0.35em] text-brand-600">
+            Rewards
+          </h1>
+          <span className="flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-black tabular-nums text-slate-700 shadow-sm ring-1 ring-slate-200/70">
+            <Icon name="coin" size={13} />
+            {coins}
+          </span>
         </div>
 
-        {/* daily goal card + floating daily bonus bubble */}
-        <div className="relative mt-3 w-full rounded-2xl border border-slate-200/70 bg-white p-4 text-left shadow-sm">
-          {bubbleVisible && (
-            <button
-              onClick={onCollectBubble}
-              aria-label="Collect daily bonus"
-              className="absolute -top-4 right-2 z-10 flex h-16 w-16 animate-float flex-col items-center justify-center rounded-full border-2 border-amber-300/70 bg-amber-400 text-slate-900 shadow-lg shadow-amber-500/40 transition-transform active:scale-90"
-            >
-              <span className="text-[8px] font-black uppercase">Bonus</span>
-              <span className="text-sm font-black">+{bubbleValue}🪙</span>
-            </button>
-          )}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-base leading-none">🎯</span>
-              <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">
-                Daily Goal
-              </p>
-            </div>
-            <p className="text-xs font-bold text-slate-500">
-              {Math.min(completedToday, DAILY_GOAL)}/{DAILY_GOAL} sessions
-            </p>
-          </div>
-          <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-sky-100">
-            <div
-              className={`relative h-full overflow-hidden rounded-full bg-gradient-to-r transition-all duration-500 ${
-                dailyGoalReached
-                  ? 'from-emerald-400 to-emerald-600'
-                  : 'from-sky-400 to-brand-600'
-              }`}
-              style={{
-                width: `${Math.min(100, (completedToday / DAILY_GOAL) * 100)}%`,
-              }}
-            >
-              <div className="absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-white/40 to-transparent bg-[length:200%_100%]" />
-            </div>
-          </div>
-          {dailyGoalClaimed ? (
-            <p className="mt-3 flex items-center justify-center gap-1 text-[11px] font-black text-emerald-600">
-              <span className="rw-pop inline-block">✓</span> Claimed today — come back tomorrow
-            </p>
-          ) : dailyGoalReached ? (
-            <button
-              onClick={onClaimGoal}
-              className="mt-3 w-full rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 py-2.5 text-xs font-black uppercase tracking-wide text-white shadow-md shadow-emerald-500/30 transition-transform active:scale-95"
-            >
-              Claim reward +{DAILY_GOAL_REWARD} 🪙
-            </button>
-          ) : (
-            <p className="mt-3 text-[11px] font-semibold text-slate-500">
-              Complete {DAILY_GOAL} sessions to claim the daily reward
-            </p>
-          )}
-        </div>
-
-        {/* Day 1-7 check-in strip */}
-        <div className="mt-3 w-full rounded-2xl border border-slate-200/70 bg-white p-4 text-left shadow-sm">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-base leading-none">📅</span>
-              <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">
-                Check-in Streak
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="whitespace-nowrap rounded-full bg-brand-50 px-2 py-0.5 text-[9px] font-black tracking-wide text-brand-600">
-                Cycle {jackpots + 1} · ×{formatMult(checkinMultiplier(jackpots))}
-              </span>
-              <p className="text-xs font-bold text-amber-500">
-                🔥 {currentStreak}-day streak
-              </p>
-            </div>
-          </div>
-          <div className="mt-3 grid grid-cols-7 gap-1.5">
-            {DAY_REWARDS.map((reward, i) => {
-              const day = i + 1;
-              const escalated = checkinReward(day, jackpots);
-              const claimed = claimedDays.includes(day);
-              const todayAlreadyClaimed = lastCheckinDate === todayKey();
-              const nextDay = claimedDays.length + 1;
-              const focusedToday = lastFocusDate === todayKey();
-              const checkinDateValid =
-                lastCheckinDate === null ||
-                daysBetween(lastCheckinDate, todayKey()) > 0;
-              const claimable =
-                day === nextDay &&
-                !claimed &&
-                currentStreak >= day &&
-                focusedToday &&
-                checkinDateValid &&
-                !todayAlreadyClaimed;
-              const isJackpot = day === DAY_REWARDS.length;
-              return (
-                <button
-                  key={day}
-                  disabled={!claimable}
-                  onClick={() => onClaimDay(day)}
-                  className={`relative flex flex-col items-center gap-0.5 overflow-hidden rounded-lg border px-1 py-1.5 transition-all duration-200 active:scale-90 ${
-                    claimed
-                      ? 'border-emerald-300 bg-emerald-50'
-                      : claimable
-                        ? 'animate-pulse border-amber-300 bg-gradient-to-b from-amber-100 to-amber-50 shadow-md shadow-amber-500/20'
-                        : 'border-slate-200 bg-slate-50 opacity-70'
-                  }`}
-                >
-                  {claimable && (
-                    <div className="absolute -right-2 -top-2 h-5 w-5 rounded-full bg-amber-300/40" />
-                  )}
-                  <span
-                    key={`d-${day}-${claimed ? 'c' : claimable ? 'a' : 'l'}`}
-                    className={`rw-pop text-[9px] font-bold ${
-                      claimed
-                        ? 'text-emerald-600'
-                        : claimable
-                          ? 'text-amber-600'
-                          : 'text-slate-500'
-                    }`}
-                  >
-                    {isJackpot && !claimed ? '👑' : `D${day}`}
-                  </span>
-                  <span className="text-[10px] font-black text-slate-700">
-                    🪙{escalated}
-                  </span>
-                  <span
-                    key={`s-${day}-${claimed ? 'c' : claimable ? 'a' : 'l'}`}
-                    className={`rw-pop text-[9px] font-black ${
-                      claimed
-                        ? 'text-emerald-600'
-                        : claimable
-                          ? 'text-amber-600'
-                          : 'text-slate-400'
-                    }`}
-                  >
-                  {claimed ? '✓' : claimable ? 'GET' : '🔒'}
-                </span>
+        {/* two tabs keep the page's two jobs apart */}
+        <div
+          role="tablist"
+          aria-label="Rewards sections"
+          className="mt-3 flex gap-1 rounded-xl bg-white p-1 shadow-sm ring-1 ring-slate-200/70"
+        >
+          {TABS.map(t => {
+            const isActive = tab === t.key;
+            return (
+              <button
+                key={t.key}
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setTab(t.key)}
+                className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg text-[11px] font-black uppercase tracking-wide transition-colors ${
+                  isActive
+                    ? 'bg-brand-600 text-white shadow-sm'
+                    : 'text-slate-500'
+                }`}
+              >
+                <Icon
+                  name={t.icon}
+                  size={13}
+                  tone={isActive ? 'inherit' : 'slate'}
+                  className={isActive ? 'text-white' : undefined}
+                />
+                {t.label}
               </button>
             );
           })}
         </div>
+
+        {tab === 'claim' && (
+          <>
+            {/* The Today card spans the full width: it is the page's primary
+                surface, and a half-width column squeezed the seven check-in
+                cells below the 44px tap minimum on every tablet. */}
+            <section className="mt-3 rounded-2xl border border-slate-200/70 bg-white p-4 text-left shadow-sm">
+                <header className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5 text-slate-500">
+                    <Icon name="target" size={16} plate />
+                    <h2 className="text-[11px] font-black uppercase tracking-widest">
+                      Today
+                    </h2>
+                  </div>
+                  <span className="whitespace-nowrap rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-black tabular-nums tracking-wider text-brand-600">
+                    Cycle {jackpots + 1} · x{formatMult(mult)}
+                  </span>
+                </header>
+
+                {/* step 1 — focus minutes */}
+                <div className="mt-3">
+                  <div className="flex items-baseline justify-between">
+                    <p className="text-xs font-black text-slate-700">Focus goal</p>
+                    <p className="text-[11px] font-bold tabular-nums text-slate-500">
+                      {Math.min(minutesToday, DAILY_GOAL)}/{DAILY_GOAL} min
+                    </p>
+                  </div>
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-sky-100">
+                    <div
+                      className={`relative h-full overflow-hidden rounded-full bg-gradient-to-r transition-all duration-500 ${
+                        dailyGoalReached
+                          ? 'from-emerald-400 to-emerald-600'
+                          : 'from-sky-400 to-brand-600'
+                      }`}
+                      style={{ width: `${goalPct}%` }}
+                    >
+                      <div className="absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-white/40 to-transparent bg-[length:200%_100%]" />
+                    </div>
+                  </div>
+
+                  {dailyGoalClaimed ? (
+                    <p className="mt-2 flex items-center justify-center gap-1 text-[11px] font-black text-emerald-600">
+                      <span className="rw-pop inline-block">
+                        <Icon name="check" size={12} />
+                      </span>
+                      Claimed today — come back tomorrow
+                    </p>
+                  ) : dailyGoalReached ? (
+                    <button
+                      onClick={onClaimGoal}
+                      className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 py-2.5 text-xs font-black uppercase tracking-wide text-white shadow-md shadow-emerald-500/30 transition-transform active:scale-95"
+                    >
+                      Claim daily goal +{DAILY_GOAL_REWARD}
+                      <Icon name="coin" size={13} tone="inherit" />
+                    </button>
+                  ) : (
+                    <p className="mt-2 text-[11px] font-semibold text-slate-500">
+                      {DAILY_GOAL - Math.min(minutesToday, DAILY_GOAL)} more focused
+                      minutes to claim +{DAILY_GOAL_REWARD}
+                    </p>
+                  )}
+                </div>
+
+                {/* step 2 — the check-in strip */}
+                <div className="mt-4 border-t border-slate-100 pt-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="flex items-center gap-1 text-xs font-black text-slate-700">
+                      <Icon name="calendar" size={13} plate />
+                      Streak check-in
+                    </p>
+                    <p className="flex items-center gap-1 text-[11px] font-bold text-amber-500">
+                      <Icon name="flame" size={11} />
+                      {currentStreak}-day
+                    </p>
+                  </div>
+                  {/* Seven cells need 332px of content width to clear 44px
+                      each (7*44 + 6*4 gap), which is a 400px viewport once the
+                      page and card padding are added. Below that the strip
+                      wraps to 4+3 rather than shipping a 39px tap target. */}
+                  <div className="mt-2 grid grid-cols-4 gap-1 min-[400px]:grid-cols-7 sm:gap-1.5">
+                    {DAY_REWARDS.map((reward, i) => {
+                      const day = i + 1;
+                      const escalated = checkinReward(day, jackpots);
+                      const claimed = claimedDays.includes(day);
+                      const claimable = day === claimableDay;
+                      const isJackpot = day === DAY_REWARDS.length;
+                      return (
+                        <button
+                          key={day}
+                          disabled={!claimable}
+                          onClick={() => onClaimDay(day)}
+                          aria-label={
+                            claimed
+                              ? `Day ${day} claimed`
+                              : claimable
+                                ? `Claim day ${day} reward, ${escalated} coins`
+                                : `Day ${day} locked, ${escalated} coins`
+                          }
+                          className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg border px-1 py-1.5 transition-all duration-200 active:scale-90 ${
+                            claimed
+                              ? 'border-emerald-300 bg-emerald-50'
+                              : claimable
+                                ? 'animate-pulse border-amber-300 bg-gradient-to-b from-amber-100 to-amber-50 shadow-md shadow-amber-500/20'
+                                : 'border-slate-200 bg-slate-50 opacity-70'
+                          }`}
+                        >
+                          <span
+                            className={`text-[10px] font-bold ${
+                              claimed
+                                ? 'text-emerald-600'
+                                : claimable
+                                  ? 'text-amber-600'
+                                  : 'text-slate-500'
+                            }`}
+                          >
+                            {isJackpot && !claimed ? (
+                              <Icon name="crown" size={12} className="mx-auto" />
+                            ) : (
+                              `D${day}`
+                            )}
+                          </span>
+                          <span className="flex items-center gap-0.5 text-[11px] font-black tabular-nums text-slate-700">
+                            <Icon name="coin" size={9} />
+                            {escalated}
+                          </span>
+                          <span
+                            className={`text-[10px] font-black ${
+                              claimed
+                                ? 'text-emerald-600'
+                                : claimable
+                                  ? 'text-amber-600'
+                                  : 'text-slate-400'
+                            }`}
+                          >
+                            {claimed ? (
+                              <Icon name="check" size={11} className="mx-auto" />
+                            ) : claimable ? (
+                              'GET'
+                            ) : (
+                              <Icon name="lock" size={10} className="mx-auto" />
+                            )}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-2 text-[10px] font-semibold leading-relaxed text-slate-400">
+                    {claimableDay !== null
+                      ? `Day ${claimableDay} is ready — one check-in per day.`
+                      : currentStreak === 0
+                        ? 'Finish a focus session to check in for Day 1.'
+                        : 'Check in again tomorrow — one day per calendar day.'}
+                  </p>
+                </div>
+
+                {/* step 3 — the daily gift. It used to be a floating bubble
+                    pinned over this card's own counter, which is why it is a
+                    plain row now. */}
+                <div className="mt-3 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2.5">
+                  <Icon name="gift" size={15} tone="amber" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-black text-amber-700">
+                      Daily gift
+                    </p>
+                    <p className="text-[10px] font-semibold text-slate-500">
+                      {bonusAvailable
+                        ? `A free top-up, once a day`
+                        : 'Collected — a new one lands tomorrow'}
+                    </p>
+                  </div>
+                  {bonusAvailable ? (
+                    <button
+                      onClick={onCollectBonus}
+                      className="flex min-h-11 shrink-0 items-center gap-1 rounded-xl bg-amber-500 px-3 py-2 text-xs font-black uppercase tracking-wide text-white shadow-sm shadow-amber-500/30 transition-transform active:scale-95"
+                    >
+                      +{bonusValue}
+                      <Icon name="coin" size={12} tone="inherit" />
+                    </button>
+                  ) : (
+                    <span className="flex h-9 shrink-0 items-center gap-1 rounded-xl bg-white px-2.5 text-[10px] font-black uppercase tracking-wide text-emerald-600">
+                      <Icon name="check" size={11} tone="emerald" />
+                      Done
+                    </span>
+                  )}
+                </div>
+              </section>
+
+            <div className="md:grid md:grid-cols-2 md:items-start md:gap-x-6">
+              <div>
+                <AchievementsCard
+                  longestSession={longestSession}
+                  bestStreak={bestStreak}
+                  petsOwned={ownedMascots.length}
+                  focusSeconds={focusSeconds}
+                  totalSessions={totalSessions}
+                  jackpots={jackpots}
+                />
+              </div>
+
+              <div>
+                <PetCollection
+                  stats={{ focusSeconds, totalSessions, bestStreak }}
+                  ownedMascots={ownedMascots}
+                  activeMascot={activeMascot}
+                  onEquip={onEquipMascot}
+                />
+              </div>
+            </div>
+          </>
+        )}
+
+        {tab === 'collect' && (
+          <div className="md:grid md:grid-cols-2 md:items-start md:gap-x-6">
+            <div>
+              <AccessoryShop
+                coins={coins}
+                ownedAccessories={ownedAccessories}
+                equippedAccessory={equippedAccessory}
+                onBuy={onBuyAccessory}
+                onEquip={onEquipAccessory}
+              />
+            </div>
+            <div>
+              <ThemeShop
+                coins={coins}
+                ownedThemes={ownedThemes}
+                activeTheme={activeTheme}
+                onBuy={onBuyTheme}
+                onEquip={onEquipTheme}
+              />
+            </div>
+          </div>
+        )}
       </div>
-
-      <AchievementsCard
-        longestSession={longestSession}
-        bestStreak={bestStreak}
-        trees={trees}
-        jackpots={jackpots}
-        totalSessions={totalSessions}
-      />
-
-      <MascotShop
-        coins={coins}
-        ownedMascots={ownedMascots}
-        activeMascot={activeMascot}
-        onBuy={onBuyMascot}
-        onEquip={onEquipMascot}
-      />
-
-      <AccessoryShop
-        coins={coins}
-        ownedAccessories={ownedAccessories}
-        equippedAccessory={equippedAccessory}
-        onBuy={onBuyAccessory}
-        onEquip={onEquipAccessory}
-      />
-
-      <ThemeShop
-        coins={coins}
-        ownedThemes={ownedThemes}
-        activeTheme={activeTheme}
-        onBuy={onBuyTheme}
-        onEquip={onEquipTheme}
-      />
     </div>
-  </div>
-);
+  );
 };
 
 export default RewardsPage;
