@@ -1,0 +1,19 @@
+{
+  // Renders components/Mascot.tsx to a static HTML gallery for visual review.
+  "compilerOptions": {
+    "outDir": "../../.tmp-gallery",
+    "module": "commonjs",
+    "target": "es2019",
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "lib": ["es2019", "dom"],
+    "types": []
+  },
+  "files": [
+    "../../components/Mascot.tsx",
+    "../../components/MascotCard.tsx",
+    "../../components/PetCollection.tsx"
+  ]
+}
