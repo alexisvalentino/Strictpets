@@ -43,6 +43,10 @@ export const STREAK_FREEZE_MAX = 3; // cap how many can be hoarded (base)
 // --- Event mechanics (the banners are real) ---
 export const WEEKEND_MULTIPLIER = 2; // ×2 coins for sessions on Sat/Sun
 export const RECORD_BONUS = 50; // coins for beating your longest session
+// The record bonus is a daily trophy, not a per-session one. Paying it on every
+// new best let a player nudge the goal up a second at a time and collect 50
+// coins per session — 111 short sessions earned 8x the honest rate. It is now
+// gated by `recordBonusDate`, so it is paid at most once per calendar day.
 
 // --- Mascot accessories (cosmetics) ---
 export const ACCESSORY_CATALOG = [
@@ -238,6 +242,7 @@ export interface GameState {
   ownedThemes: ThemeId[]; // themes bought (blue is always owned)
   activeTheme: ThemeId; // the one applied to the whole app
   longestSession: number; // longest completed session in seconds (record)
+  recordBonusDate: string | null; // date the once-per-day record bonus was paid
   totalSessions: number; // completed sessions of all time
   jackpots: number; // Day-7 jackpots claimed (check-in cycles completed)
   lastCheckinDate: string | null; // YYYY-MM-DD of the last check-in day claimed (one per day cap)
@@ -272,6 +277,7 @@ export const defaultGameState = (): GameState => ({
   ownedThemes: ['blue'],
   activeTheme: 'blue',
   longestSession: 0,
+  recordBonusDate: null,
   totalSessions: 0,
   jackpots: 0,
   lastCheckinDate: null,
@@ -451,6 +457,7 @@ export const loadGameState = (): GameState => {
       ownedThemes,
       activeTheme,
       longestSession: safeInt(parsed.longestSession, MAX_SESSION_SECONDS),
+      recordBonusDate: validDateKey(parsed.recordBonusDate),
       totalSessions,
       jackpots: safeInt(parsed.jackpots),
       lastCheckinDate: validDateKey(parsed.lastCheckinDate),
@@ -604,7 +611,10 @@ export const recordSession = (
   const baseCoins = Math.round(seconds / 10);
   const coinsEarned = weekendBonus ? baseCoins * WEEKEND_MULTIPLIER : baseCoins;
   const newRecord = seconds > s.longestSession;
-  const recordBonus = newRecord ? RECORD_BONUS : 0;
+  // The record bonus is paid at most once per calendar day, so creeping the
+  // goal up one second per session cannot farm it.
+  const recordBonus =
+    newRecord && s.recordBonusDate !== t ? RECORD_BONUS : 0;
 
   // Focused minutes still count toward the pet collection through
   // focusSeconds below; the forest loop that consumed them is gone.
@@ -645,6 +655,7 @@ export const recordSession = (
     minutesToday: s.minutesToday + focusedMinutes,
     streakFreezes: s.streakFreezes - freezeUsed,
     longestSession: Math.max(s.longestSession, seconds),
+    recordBonusDate: recordBonus > 0 ? t : s.recordBonusDate,
     totalSessions: s.totalSessions + 1,
     // A genuinely broken streak also starts a fresh check-in cycle. Freezes
     // preserve both the streak and its check-in progress.

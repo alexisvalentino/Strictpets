@@ -856,6 +856,33 @@ console.log('== 30. Freezes are spent only when they save the streak; repair nee
   ok(lost.state.bestStreak === 6, 'best streak is kept');
 }
 
+console.log('== 33. The record bonus cannot be farmed by creeping the record ==');
+{
+  // The record bonus is a flat +RECORD_BONUS every time a session is one
+  // second longer than the stored record. Before this fix, nudging the goal up
+  // a second at a time paid the 50-coin bonus on every single session: 111
+  // short sessions earned more than ten times the honest rate for the same
+  // two hours of focus. A record bonus is now paid at most once per day.
+  let s = base();
+  let farmed = 0;
+  for (let sec = 10; sec <= 120; sec += 1) {
+    const r = gs.recordSession(s, sec, NOW);
+    s = r.state;
+    farmed += r.result.recordBonus;
+  }
+  ok(farmed === gs.RECORD_BONUS, `${farmed} bonus coins from 111 creeping sessions (was 5550)`);
+  // The record itself still tracks the true best session.
+  ok(s.longestSession === 120, 'longest session still records the real best');
+
+  // The next day the bonus is available again, once.
+  const tomorrow = new Date(2026, 7, 19, 10, 0, 0);
+  const r1 = gs.recordSession(s, 300, tomorrow);
+  ok(r1.result.recordBonus === gs.RECORD_BONUS, 'a new day can pay the record bonus again');
+  const r2 = gs.recordSession(r1.state, 301, tomorrow);
+  ok(r2.result.recordBonus === 0, 'but only once per day');
+  ok(r2.state.coins - r1.state.coins === Math.round(301 / 10), 'the session itself still pays in full');
+}
+
 console.log('== 32. Coin economy stays a long-term goal ==');
 {
   // 30 days at 25 min/day: a steady player still has things left to buy.
