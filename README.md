@@ -1,29 +1,43 @@
-# 🐾 Focus Tracker — Focus Together With Your Pet
+# 🐾 Focus Tracker — Strict Focus Sessions With Your Pet
 
 > "Set the phone down. I'll keep you company." — your pet
 
 ## 🎯 What Is This?
 
-A friendly focus buddy. Pick a goal, put your phone down, and your pet focuses
-alongside you. Finish the session and you both grow: coins, streaks, a growing
-collection of friends, and a wardrobe of accessories. If a tap or a bump ends a
-session early, that's okay — your pet is always ready for another round.
+A strict, pet-powered focus timer. Choose a goal, press Start, then put your
+phone down and stay in the app until time is up. A touch after a session starts,
+switching away from the app, reloading, or detected phone movement ends the
+attempt. You can start another session whenever you're ready.
+
+Completed sessions earn coins and build long-term progress. The 22 pets unlock
+at milestones for focused minutes, completed sessions, and streaks. A session
+that crosses a milestone can unlock one or more new friends; pet unlocks are
+milestone-based, not random rewards after every session. Interrupted attempts
+do not advance pet progress and may earn only a small consolation reward.
 
 ## ✨ Features
 
-- **Focus Timer**: 30 seconds, 1, 5, or 25 minutes, or any custom goal up to 4 hours
-- **Pet Collection**: 22 cute pets to meet — each one unlocks as you focus
-- **Coin Economy**: Earn focus coins per 10 seconds focused; cosmetics are long-term goals
-- **Daily Goal**: 15 focused minutes a day earns a bonus (minutes, not taps)
-- **Streaks & Check-ins**: Focus daily to grow your streak and climb the 7-day check-in jackpot
-- **Streak Shield & Repair**: One shield covers one missed day (120 🪙, buy before you
-  miss), or repair a missed day (160 🪙) if you would rather pay afterwards
-- **Gentle Reminders**: One evening notification if your streak is waiting (you choose to allow it)
-- **This Week**: A 7-day view of how much you focused
-- **Shops**: Accessories and app themes to unlock with coins
-- **Weekend Double Points**: Saturdays and Sundays earn ×2 coins
-- **Safe by design**: No accounts, no ads, no tracking — progress stays on your device
-  (with a native backup so the OS clearing web storage doesn't erase it)
+- **Strict focus sessions**: Touching the screen, leaving or reloading the app, or detected
+  movement interrupts a running session.
+- **Flexible timer**: Choose 30 seconds, 1, 5, or 25 minutes, or set a custom goal from
+  10 seconds up to 4 hours.
+- **Pet collection**: Meet 22 pets by reaching focused-minute, completed-session, and
+  streak milestones.
+- **Focus coins**: Completed sessions earn coins based on time focused; the base coin
+  reward doubles on weekends.
+- **Daily focus goal**: Reach 15 focused minutes in a day to claim 60 coins.
+- **Streak check-in**: Complete a focus session today to unlock one check-in reward.
+  Build through a 7-day cycle, then start an escalating cycle.
+- **Daily gift**: Collect a separate free coin gift once per day, even without
+  completing a focus session.
+- **Streak shield and repair**: Buy one shield for 120 coins to cover a missed day,
+  or repair a missed day for 160 coins.
+- **Gentle reminders**: Choose whether to allow an evening reminder when your streak
+  needs attention.
+- **This week**: See your focus time across the last seven days.
+- **Shops**: Unlock accessories and app themes with coins.
+- **Private by design**: No account, ads, or tracking. Progress stays on your device,
+  with a native backup for app data.
 
 ## 🛠 Tech Stack
 
@@ -58,18 +72,33 @@ npx tsc -p tests/gallery/tsconfig.json && node tests/gallery/render.js
 npm run build
 npx cap sync
 cd android
-./gradlew assembleDebug
 ```
 
-APK will be at `android/app/build/outputs/apk/debug/app-debug.apk`
+On Windows, build the debug APK with:
+
+```powershell
+.\gradlew.bat assembleDebug
+```
+
+On macOS or Linux, use `./gradlew assembleDebug`. The debug APK is written to
+`android/app/build/outputs/apk/debug/app-debug.apk`.
+
+For a signed release APK and Play Store bundle, configure your local,
+git-ignored `android/keystore.properties`, then run:
+
+```powershell
+.\gradlew.bat assembleRelease bundleRelease
+```
+
+The release APK and AAB are written under `android/app/build/outputs/apk/release`
+and `android/app/build/outputs/bundle/release`.
 
 ### iOS
 
 ```bash
 npm run build
 npx cap sync
-cd ios
-open App.xcworkspace
+open ios/App/App.xcworkspace
 ```
 
 Then hit **Run** in Xcode.
