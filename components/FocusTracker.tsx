@@ -27,6 +27,7 @@ import {
   canBuyStreakFreeze,
   canRepairStreak,
   clampCustomDuration,
+  checkinProgress,
   claimableCheckinDay,
   claimDailyBonus,
   claimDayReward,
@@ -664,6 +665,8 @@ const FocusTracker = () => {
   const weekend = isWeekend();
   // Engine rule — the strip, the badge, and the claim all agree.
   const claimableDay = claimableCheckinDay(game);
+  const checkedInToday = game.lastCheckinDate === todayKey();
+  const streakCheckinProgress = checkinProgress(game);
   const rewardsBadge = claimableDay !== null || dailyGoalReached || bonusAvailable;
 
   return (
@@ -1128,7 +1131,6 @@ const FocusTracker = () => {
             minutesToday={goal.minutes}
             dailyGoalReached={dailyGoalReached}
             dailyGoalClaimed={goal.claimed}
-            claimedDays={game.claimedDays}
             ownedMascots={game.ownedMascots}
             activeMascot={game.activeMascot}
             ownedAccessories={game.ownedAccessories}
@@ -1141,6 +1143,8 @@ const FocusTracker = () => {
             totalSessions={game.totalSessions}
             focusSeconds={game.focusSeconds}
             claimableDay={claimableDay}
+            checkinProgress={streakCheckinProgress}
+            checkedInToday={checkedInToday}
             bonusAvailable={bonusAvailable}
             bonusValue={dailyBonusValue()}
             onCollectBonus={collectBubble}

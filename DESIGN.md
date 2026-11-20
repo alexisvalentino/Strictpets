@@ -120,14 +120,16 @@ one **24×24 grid**, `stroke-width: 2`, round caps and joins, `fill: none`,
 - **The streak number appears once per screen.** The hero band owns it; the
   protection card owns the shield state; the pet card is about the pet. Three
   cards each restating "4 days" made the page stutter.
-- **Rewards has two tabs: Claim and Collect.** Claim holds the Today card
-  (focus goal → streak check-in → daily gift, in the order they unlock),
-  achievements, and the pet collection. Collect holds the accessory and theme
-  shops. A single scroll that mixed a wallet, two shops, 22 pets, and 18 badges
-  had no hierarchy at all.
-- **The Today card spans the full width.** It is the page's primary surface,
-  and putting it in a half-width tablet column squeezed the seven check-in
-  cells below the 44px tap minimum at every viewport ≥768px.
+- **Rewards has two tabs: Claim and Collect.** Claim gives the focus goal,
+  streak check-in, and daily gift separate sections because each has different
+  eligibility. The daily gift is available once per calendar day without
+  focusing; streak check-ins require a focus session and advance once per day.
+  Achievements and the pet collection follow. Collect holds the accessory and
+  theme shops. A single scroll that mixed a wallet, two shops, 22 pets, and 18
+  badges had no hierarchy at all.
+- **Claim sections span the full width.** The seven check-in cells need enough
+  room to clear the 44px tap minimum; a half-width tablet column squeezed them
+  below that target at every viewport ≥768px.
 - Pages live in a horizontally swipeable snap carousel; the tab bar and swipe
   both drive it. A vertical swipe must never change tab (verified in
   `tests/gallery/gesture.js`).

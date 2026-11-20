@@ -22,7 +22,6 @@ interface RewardsPageProps {
   minutesToday: number; // focused minutes today — the daily goal measures this
   dailyGoalReached: boolean;
   dailyGoalClaimed: boolean;
-  claimedDays: number[];
   ownedMascots: MascotId[];
   activeMascot: MascotId;
   ownedAccessories: AccessoryId[];
@@ -35,6 +34,8 @@ interface RewardsPageProps {
   totalSessions: number;
   focusSeconds: number; // lifetime focused seconds (pet unlocks)
   claimableDay: number | null; // from claimableCheckinDay — the engine's rule
+  checkinProgress: number;
+  checkedInToday: boolean;
   bonusAvailable: boolean; // today's gift is still unclaimed
   bonusValue: number;
   onCollectBonus: () => void;
@@ -68,7 +69,6 @@ const RewardsPage = ({
   minutesToday,
   dailyGoalReached,
   dailyGoalClaimed,
-  claimedDays,
   ownedMascots,
   activeMascot,
   ownedAccessories,
@@ -81,6 +81,8 @@ const RewardsPage = ({
   totalSessions,
   focusSeconds,
   claimableDay,
+  checkinProgress,
+  checkedInToday,
   bonusAvailable,
   bonusValue,
   onCollectBonus,
@@ -95,7 +97,18 @@ const RewardsPage = ({
   const [tab, setTab] = useState<RewardsTab>('claim');
 
   const goalPct = Math.min(100, (minutesToday / DAILY_GOAL) * 100);
-  const mult = checkinMultiplier(jackpots);
+  const completedCycleToday = checkedInToday && checkinProgress === DAY_REWARDS.length;
+  const displayJackpots = completedCycleToday ? Math.max(0, jackpots - 1) : jackpots;
+  const mult = checkinMultiplier(displayJackpots);
+  const checkinStatus = completedCycleToday
+    ? 'Seven-day cycle complete. Your next cycle opens tomorrow.'
+    : checkedInToday
+      ? 'Checked in today. Your next streak reward is available tomorrow.'
+      : claimableDay !== null
+        ? `Day ${claimableDay} is ready. Claim once each day to advance.`
+        : currentStreak === 0
+          ? 'Complete a focus session today to unlock your first check-in.'
+          : 'Focus today to unlock your next streak reward.';
 
   return (
     <div className="flex h-full w-full shrink-0 snap-start flex-col overflow-y-auto">
@@ -153,189 +166,174 @@ const RewardsPage = ({
 
         {tab === 'claim' && (
           <>
-            {/* The Today card spans the full width: it is the page's primary
-                surface, and a half-width column squeezed the seven check-in
-                cells below the 44px tap minimum on every tablet. */}
             <section className="mt-3 rounded-2xl border border-slate-200/70 bg-white p-4 text-left shadow-sm">
-                <header className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5 text-slate-500">
-                    <Icon name="target" size={16} plate />
-                    <h2 className="text-[11px] font-black uppercase tracking-widest">
-                      Today
-                    </h2>
-                  </div>
-                  <span className="whitespace-nowrap rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-black tabular-nums tracking-wider text-brand-600">
-                    Cycle {jackpots + 1} · x{formatMult(mult)}
+              <header className="flex items-center gap-2.5 text-slate-500">
+                <Icon name="target" size={16} plate />
+                <h2 className="text-[11px] font-black uppercase tracking-widest">
+                  Focus goal
+                </h2>
+              </header>
+              <div className="mt-3 flex items-baseline justify-between">
+                <p className="text-xs font-black text-slate-700">Today&apos;s progress</p>
+                <p className="text-[11px] font-bold tabular-nums text-slate-500">
+                  {Math.min(minutesToday, DAILY_GOAL)}/{DAILY_GOAL} min
+                </p>
+              </div>
+              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-sky-100">
+                <div
+                  className={`relative h-full overflow-hidden rounded-full bg-gradient-to-r transition-all duration-500 ${
+                    dailyGoalReached || dailyGoalClaimed
+                      ? 'from-emerald-400 to-emerald-600'
+                      : 'from-sky-400 to-brand-600'
+                  }`}
+                  style={{ width: `${goalPct}%` }}
+                >
+                  <div className="absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-white/40 to-transparent bg-[length:200%_100%]" />
+                </div>
+              </div>
+
+              {dailyGoalClaimed ? (
+                <p className="mt-2 flex items-center justify-center gap-1 text-[11px] font-black text-emerald-600">
+                  <span className="rw-pop inline-block">
+                    <Icon name="check" size={12} />
                   </span>
-                </header>
+                  Goal reward claimed today
+                </p>
+              ) : dailyGoalReached ? (
+                <button
+                  onClick={onClaimGoal}
+                  className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 py-2.5 text-xs font-black uppercase tracking-wide text-white shadow-md shadow-emerald-500/30 transition-transform active:scale-95"
+                >
+                  Claim +{DAILY_GOAL_REWARD}
+                  <Icon name="coin" size={13} tone="inherit" />
+                </button>
+              ) : (
+                <p className="mt-2 text-[11px] font-semibold text-slate-500">
+                  {DAILY_GOAL - Math.min(minutesToday, DAILY_GOAL)} more focused
+                  minutes to earn {DAILY_GOAL_REWARD} coins
+                </p>
+              )}
+            </section>
 
-                {/* step 1 — focus minutes */}
-                <div className="mt-3">
-                  <div className="flex items-baseline justify-between">
-                    <p className="text-xs font-black text-slate-700">Focus goal</p>
-                    <p className="text-[11px] font-bold tabular-nums text-slate-500">
-                      {Math.min(minutesToday, DAILY_GOAL)}/{DAILY_GOAL} min
-                    </p>
-                  </div>
-                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-sky-100">
-                    <div
-                      className={`relative h-full overflow-hidden rounded-full bg-gradient-to-r transition-all duration-500 ${
-                        dailyGoalReached
-                          ? 'from-emerald-400 to-emerald-600'
-                          : 'from-sky-400 to-brand-600'
+            <section className="mt-3 rounded-2xl border border-slate-200/70 bg-white p-4 text-left shadow-sm">
+              <header className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 text-slate-500">
+                  <Icon name="calendar" size={16} plate />
+                  <h2 className="text-[11px] font-black uppercase tracking-widest">
+                    Streak check-in
+                  </h2>
+                </div>
+                <span className="whitespace-nowrap rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-black tabular-nums tracking-wider text-brand-600">
+                  Cycle {displayJackpots + 1} · ×{formatMult(mult)}
+                </span>
+              </header>
+              <p className="mt-2 flex items-center gap-1 text-[11px] font-bold text-amber-600">
+                <Icon name="flame" size={12} />
+                {currentStreak} day{currentStreak === 1 ? '' : 's'} in your streak
+              </p>
+              {/* Seven cells need 332px of content width to clear 44px
+                  each (7*44 + 6*4 gap), which is a 400px viewport once the
+                  page and card padding are added. Below that the strip
+                  wraps to 4+3 rather than shipping a 39px tap target. */}
+              <div className="mt-2 grid grid-cols-4 gap-1 min-[400px]:grid-cols-7 sm:gap-1.5">
+                {DAY_REWARDS.map((reward, i) => {
+                  const day = i + 1;
+                  const escalated = checkinReward(day, displayJackpots);
+                  const claimed = completedCycleToday || day <= checkinProgress;
+                  const claimable = day === claimableDay;
+                  const isJackpot = day === DAY_REWARDS.length;
+                  return (
+                    <button
+                      key={day}
+                      disabled={!claimable}
+                      onClick={() => onClaimDay(day)}
+                      aria-label={
+                        claimed
+                          ? `Day ${day} claimed`
+                          : claimable
+                            ? `Claim day ${day} reward, ${escalated} coins`
+                            : `Day ${day} locked, ${escalated} coins`
+                      }
+                      className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg border px-1 py-1.5 transition-all duration-200 active:scale-90 ${
+                        claimed
+                          ? 'border-emerald-300 bg-emerald-50'
+                          : claimable
+                            ? 'animate-pulse border-amber-300 bg-gradient-to-b from-amber-100 to-amber-50 shadow-md shadow-amber-500/20'
+                            : 'border-slate-200 bg-slate-50 opacity-70'
                       }`}
-                      style={{ width: `${goalPct}%` }}
                     >
-                      <div className="absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-white/40 to-transparent bg-[length:200%_100%]" />
-                    </div>
-                  </div>
-
-                  {dailyGoalClaimed ? (
-                    <p className="mt-2 flex items-center justify-center gap-1 text-[11px] font-black text-emerald-600">
-                      <span className="rw-pop inline-block">
-                        <Icon name="check" size={12} />
+                      <span
+                        className={`text-[10px] font-bold ${
+                          claimed
+                            ? 'text-emerald-600'
+                            : claimable
+                              ? 'text-amber-600'
+                              : 'text-slate-500'
+                        }`}
+                      >
+                        {isJackpot && !claimed ? (
+                          <Icon name="crown" size={12} className="mx-auto" />
+                        ) : (
+                          `D${day}`
+                        )}
                       </span>
-                      Claimed today — come back tomorrow
-                    </p>
-                  ) : dailyGoalReached ? (
-                    <button
-                      onClick={onClaimGoal}
-                      className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 py-2.5 text-xs font-black uppercase tracking-wide text-white shadow-md shadow-emerald-500/30 transition-transform active:scale-95"
-                    >
-                      Claim daily goal +{DAILY_GOAL_REWARD}
-                      <Icon name="coin" size={13} tone="inherit" />
+                      <span className="flex items-center gap-0.5 text-[11px] font-black tabular-nums text-slate-700">
+                        <Icon name="coin" size={9} />
+                        {escalated}
+                      </span>
+                      <span
+                        className={`text-[10px] font-black ${
+                          claimed
+                            ? 'text-emerald-600'
+                            : claimable
+                              ? 'text-amber-600'
+                              : 'text-slate-400'
+                        }`}
+                      >
+                        {claimed ? (
+                          <Icon name="check" size={11} className="mx-auto" />
+                        ) : claimable ? (
+                          'CLAIM'
+                        ) : (
+                          <Icon name="lock" size={10} className="mx-auto" />
+                        )}
+                      </span>
                     </button>
-                  ) : (
-                    <p className="mt-2 text-[11px] font-semibold text-slate-500">
-                      {DAILY_GOAL - Math.min(minutesToday, DAILY_GOAL)} more focused
-                      minutes to claim +{DAILY_GOAL_REWARD}
-                    </p>
-                  )}
-                </div>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-[10px] font-semibold leading-relaxed text-slate-500">
+                {checkinStatus}
+              </p>
+            </section>
 
-                {/* step 2 — the check-in strip */}
-                <div className="mt-4 border-t border-slate-100 pt-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="flex items-center gap-1 text-xs font-black text-slate-700">
-                      <Icon name="calendar" size={13} plate />
-                      Streak check-in
-                    </p>
-                    <p className="flex items-center gap-1 text-[11px] font-bold text-amber-500">
-                      <Icon name="flame" size={11} />
-                      {currentStreak}-day
-                    </p>
-                  </div>
-                  {/* Seven cells need 332px of content width to clear 44px
-                      each (7*44 + 6*4 gap), which is a 400px viewport once the
-                      page and card padding are added. Below that the strip
-                      wraps to 4+3 rather than shipping a 39px tap target. */}
-                  <div className="mt-2 grid grid-cols-4 gap-1 min-[400px]:grid-cols-7 sm:gap-1.5">
-                    {DAY_REWARDS.map((reward, i) => {
-                      const day = i + 1;
-                      const escalated = checkinReward(day, jackpots);
-                      const claimed = claimedDays.includes(day);
-                      const claimable = day === claimableDay;
-                      const isJackpot = day === DAY_REWARDS.length;
-                      return (
-                        <button
-                          key={day}
-                          disabled={!claimable}
-                          onClick={() => onClaimDay(day)}
-                          aria-label={
-                            claimed
-                              ? `Day ${day} claimed`
-                              : claimable
-                                ? `Claim day ${day} reward, ${escalated} coins`
-                                : `Day ${day} locked, ${escalated} coins`
-                          }
-                          className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg border px-1 py-1.5 transition-all duration-200 active:scale-90 ${
-                            claimed
-                              ? 'border-emerald-300 bg-emerald-50'
-                              : claimable
-                                ? 'animate-pulse border-amber-300 bg-gradient-to-b from-amber-100 to-amber-50 shadow-md shadow-amber-500/20'
-                                : 'border-slate-200 bg-slate-50 opacity-70'
-                          }`}
-                        >
-                          <span
-                            className={`text-[10px] font-bold ${
-                              claimed
-                                ? 'text-emerald-600'
-                                : claimable
-                                  ? 'text-amber-600'
-                                  : 'text-slate-500'
-                            }`}
-                          >
-                            {isJackpot && !claimed ? (
-                              <Icon name="crown" size={12} className="mx-auto" />
-                            ) : (
-                              `D${day}`
-                            )}
-                          </span>
-                          <span className="flex items-center gap-0.5 text-[11px] font-black tabular-nums text-slate-700">
-                            <Icon name="coin" size={9} />
-                            {escalated}
-                          </span>
-                          <span
-                            className={`text-[10px] font-black ${
-                              claimed
-                                ? 'text-emerald-600'
-                                : claimable
-                                  ? 'text-amber-600'
-                                  : 'text-slate-400'
-                            }`}
-                          >
-                            {claimed ? (
-                              <Icon name="check" size={11} className="mx-auto" />
-                            ) : claimable ? (
-                              'GET'
-                            ) : (
-                              <Icon name="lock" size={10} className="mx-auto" />
-                            )}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="mt-2 text-[10px] font-semibold leading-relaxed text-slate-400">
-                    {claimableDay !== null
-                      ? `Day ${claimableDay} is ready — one check-in per day.`
-                      : currentStreak === 0
-                        ? 'Finish a focus session to check in for Day 1.'
-                        : 'Check in again tomorrow — one day per calendar day.'}
-                  </p>
-                </div>
-
-                {/* step 3 — the daily gift. It used to be a floating bubble
-                    pinned over this card's own counter, which is why it is a
-                    plain row now. */}
-                <div className="mt-3 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2.5">
-                  <Icon name="gift" size={15} tone="amber" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-black text-amber-700">
-                      Daily gift
-                    </p>
-                    <p className="text-[10px] font-semibold text-slate-500">
-                      {bonusAvailable
-                        ? `A free top-up, once a day`
-                        : 'Collected — a new one lands tomorrow'}
-                    </p>
-                  </div>
-                  {bonusAvailable ? (
-                    <button
-                      onClick={onCollectBonus}
-                      className="flex min-h-11 shrink-0 items-center gap-1 rounded-xl bg-amber-500 px-3 py-2 text-xs font-black uppercase tracking-wide text-white shadow-sm shadow-amber-500/30 transition-transform active:scale-95"
-                    >
-                      +{bonusValue}
-                      <Icon name="coin" size={12} tone="inherit" />
-                    </button>
-                  ) : (
-                    <span className="flex h-9 shrink-0 items-center gap-1 rounded-xl bg-white px-2.5 text-[10px] font-black uppercase tracking-wide text-emerald-600">
-                      <Icon name="check" size={11} tone="emerald" />
-                      Done
-                    </span>
-                  )}
-                </div>
-              </section>
+            <section className="mt-3 flex items-center gap-3 rounded-2xl border border-slate-200/70 bg-white p-4 text-left shadow-sm">
+              <Icon name="gift" size={18} plate />
+              <div className="min-w-0 flex-1">
+                <h2 className="text-[11px] font-black uppercase tracking-widest text-slate-700">
+                  Daily gift
+                </h2>
+                <p className="mt-1 text-[11px] font-semibold leading-relaxed text-slate-500">
+                  {bonusAvailable
+                    ? 'Free coins once each day. No focus session needed.'
+                    : 'Collected today. A new gift is available tomorrow.'}
+                </p>
+              </div>
+              {bonusAvailable ? (
+                <button
+                  onClick={onCollectBonus}
+                  className="flex min-h-11 shrink-0 items-center gap-1 rounded-xl bg-amber-500 px-3 py-2 text-xs font-black uppercase tracking-wide text-white shadow-sm shadow-amber-500/30 transition-transform active:scale-95"
+                >
+                  Collect +{bonusValue}
+                  <Icon name="coin" size={12} tone="inherit" />
+                </button>
+              ) : (
+                <span className="flex min-h-11 shrink-0 items-center gap-1 rounded-xl bg-emerald-50 px-2.5 text-[10px] font-black uppercase tracking-wide text-emerald-700">
+                  <Icon name="check" size={11} tone="emerald" />
+                  Collected
+                </span>
+              )}
+            </section>
 
             <div className="md:grid md:grid-cols-2 md:items-start md:gap-x-6">
               <div>

@@ -1,5 +1,11 @@
 {
 	"appId": "com.alexisvalentino.focustracker",
 	"appName": "Focus Tracker",
-	"webDir": "out"
+	"webDir": "out",
+	"plugins": {
+		"Keyboard": {
+			"resize": "native",
+			"resizeOnFullScreen": true
+		}
+	}
 }
