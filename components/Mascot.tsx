@@ -1,6 +1,9 @@
 'use client';
 import type { ReactNode } from 'react';
-import type { AccessoryId, MascotId } from '../lib/gameState';
+import { useEffect, useState } from 'react';
+import Image from 'next/image';
+import type { AccessoryId, MascotId, PetSceneId } from '../lib/gameState';
+import PetSceneBackdrop from './PetSceneBackdrop';
 
 type Mood = 'idle' | 'running' | 'happy' | 'sad';
 
@@ -466,11 +469,12 @@ const MOUTH_DY: Partial<Record<MascotId, number>> = {
   koala: 8,
 };
 
-// Cosmetic overlays drawn on top of the face (positions are shared across all
-// animals because every head is a centered 40r circle at (60,64)).
+// Cosmetic overlays are placed against the normalized transparent portraits.
+// The same head and eye anchors are shared by the full catalog so a chosen
+// cosmetic follows the pet across every screen and mood.
 const ACCESSORIES: Record<AccessoryId, ReactNode> = {
   flower: (
-    <g>
+    <g transform="translate(-20 9) scale(1.2)">
       <circle cx="83" cy="16" r="3.2" fill="#F9A8D4" />
       <circle cx="90" cy="16" r="3.2" fill="#F9A8D4" />
       <circle cx="86.5" cy="12" r="3.2" fill="#F9A8D4" />
@@ -479,11 +483,18 @@ const ACCESSORIES: Record<AccessoryId, ReactNode> = {
       <circle cx="86.5" cy="18" r="2.4" fill="#FDE047" />
     </g>
   ),
-  bow: (
+  scarf: (
     <g>
-      <path d="M46 100 L32 92 L32 108 Z" fill="#EF4444" />
-      <path d="M74 100 L88 92 L88 108 Z" fill="#EF4444" />
-      <circle cx="60" cy="99" r="4.5" fill="#DC2626" />
+      <path
+        d="M39 76 Q60 84 81 76 L77 86 Q60 93 43 86 Z"
+        fill="#38BDF8"
+        stroke="#0284C7"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path d="M48 80 Q60 85 72 80" fill="none" stroke="#E0F2FE" strokeWidth="2" strokeLinecap="round" />
+      <path d="M52 87 L60 99 L68 87 Z" fill="#0EA5E9" stroke="#0284C7" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M58 90 L60 95 L62 90" fill="none" stroke="#BAE6FD" strokeWidth="1.4" strokeLinecap="round" />
     </g>
   ),
   'party-hat': (
@@ -500,10 +511,13 @@ const ACCESSORIES: Record<AccessoryId, ReactNode> = {
       <circle cx="67" cy="19" r="1.8" fill="#FDE68A" />
     </g>
   ),
-  cap: (
+  halo: (
     <g>
-      <path d="M38 34 Q38 10 60 10 Q82 10 82 34 L82 38 L38 38 Z" fill="#1A6DFF" />
-      <path d="M34 36 Q20 36 16 44 Q32 42 38 38 Z" fill="#0B5AE8" />
+      <ellipse cx="60" cy="15" rx="17" ry="5.5" fill="none" stroke="#7DD3FC" strokeWidth="6" opacity="0.28" />
+      <ellipse cx="60" cy="15" rx="17" ry="5.5" fill="none" stroke="#38BDF8" strokeWidth="2.8" />
+      <path d="M47 12 Q60 7 73 12" fill="none" stroke="#E0F2FE" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M40 18 L42 14 L44 18 L48 19.5 L44 21 L42 25 L40 21 L36 19.5 Z" fill="#FBBF24" />
+      <path d="M79 9 L80.5 6 L82 9 L85 10.5 L82 12 L80.5 15 L79 12 L76 10.5 Z" fill="#FBBF24" />
     </g>
   ),
   sunglasses: (
@@ -516,7 +530,7 @@ const ACCESSORIES: Record<AccessoryId, ReactNode> = {
     </g>
   ),
   crown: (
-    <g>
+    <g transform="translate(0 7)">
       <path
         d="M42 36 L42 18 L50 26 L60 14 L70 26 L78 18 L78 36 Z"
         fill="#FBBF24"
@@ -531,20 +545,27 @@ const ACCESSORIES: Record<AccessoryId, ReactNode> = {
 
 const Mascot = ({
   mood,
-  variant = 'bear',
+  variant = 'cat',
   accessory = null,
+  scene = 'classic',
   className,
   still = false,
 }: {
   mood: Mood;
   variant?: MascotId;
   accessory?: AccessoryId | null;
+  scene?: PetSceneId;
   className?: string;
   still?: boolean; // no idle animation (dense grids, locked silhouettes)
 }) => {
+  const [imageFailed, setImageFailed] = useState(false);
   const sad = mood === 'sad';
   const happy = mood === 'happy';
   const eyeColor = LIGHT_EYES.has(variant) ? '#FFFFFF' : '#1E293B';
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [variant]);
 
   const animationClass = still
     ? ''
@@ -558,6 +579,7 @@ const Mascot = ({
 
   return (
     <div className={`relative ${className ?? ''}`}>
+      <PetSceneBackdrop scene={scene} />
       {/* Explosive celebratory confetti burst */}
       {happy && (
         <div
@@ -594,96 +616,137 @@ const Mascot = ({
         </div>
       )}
 
-      <svg viewBox="0 0 120 120" className={`h-full w-full ${animationClass}`} aria-hidden="true">
-        {HEADS[variant]}
+      <div className={`mascot-art relative z-10 h-full w-full ${animationClass}`} aria-hidden="true">
+        {imageFailed ? (
+          <svg viewBox="0 0 120 120" className="h-full w-full">
+            {HEADS[variant]}
 
-        {/* blush */}
-        <ellipse cx="37" cy="78" rx="6" ry="3.5" fill="#FCA5A5" opacity="0.55" />
-        <ellipse cx="83" cy="78" rx="6" ry="3.5" fill="#FCA5A5" opacity="0.55" />
+            {/* blush */}
+            <ellipse cx="37" cy="78" rx="6" ry="3.5" fill="#FCA5A5" opacity="0.55" />
+            <ellipse cx="83" cy="78" rx="6" ry="3.5" fill="#FCA5A5" opacity="0.55" />
 
-        {/* eyes */}
-        {happy ? (
-          <g stroke={eyeColor} strokeWidth="4" strokeLinecap="round" fill="none">
-            <path d="M40 60 Q45 53 50 60" />
-            <path d="M70 60 Q75 53 80 60" />
-          </g>
-        ) : sad ? (
-          <g stroke={eyeColor} strokeWidth="4" strokeLinecap="round" fill="none">
-            <path d="M40 62 Q45 68 50 62" />
-            <path d="M70 62 Q75 68 80 62" />
-          </g>
-        ) : (
-          <g className={mood === 'idle' && !still ? 'mascot-blink' : undefined}>
-            {/* white sclera under the pupils (classic cute panda eyes) */}
-            {variant === 'panda' && (
-              <>
-                <circle cx="45" cy="60" r="6" fill="#FFFFFF" />
-                <circle cx="75" cy="60" r="6" fill="#FFFFFF" />
-              </>
+            {/* eyes */}
+            {happy ? (
+              <g stroke={eyeColor} strokeWidth="4" strokeLinecap="round" fill="none">
+                <path d="M40 60 Q45 53 50 60" />
+                <path d="M70 60 Q75 53 80 60" />
+              </g>
+            ) : sad ? (
+              <g stroke={eyeColor} strokeWidth="4" strokeLinecap="round" fill="none">
+                <path d="M40 62 Q45 68 50 62" />
+                <path d="M70 62 Q75 68 80 62" />
+              </g>
+            ) : (
+              <g className={mood === 'idle' && !still ? 'mascot-blink' : undefined}>
+                {/* white sclera under the pupils (classic cute panda eyes) */}
+                {variant === 'panda' && (
+                  <>
+                    <circle cx="45" cy="60" r="6" fill="#FFFFFF" />
+                    <circle cx="75" cy="60" r="6" fill="#FFFFFF" />
+                  </>
+                )}
+                <circle cx="45" cy="60" r="4.8" fill="#1E293B" />
+                <circle cx="75" cy="60" r="4.8" fill="#1E293B" />
+                <circle cx="46.6" cy="58.2" r="1.6" fill="#FFFFFF" />
+                <circle cx="76.6" cy="58.2" r="1.6" fill="#FFFFFF" />
+              </g>
             )}
-            <circle cx="45" cy="60" r="4.8" fill="#1E293B" />
-            <circle cx="75" cy="60" r="4.8" fill="#1E293B" />
-            <circle cx="46.6" cy="58.2" r="1.6" fill="#FFFFFF" />
-            <circle cx="76.6" cy="58.2" r="1.6" fill="#FFFFFF" />
-          </g>
-        )}
 
-        {/* focused eyebrows while a session is running */}
-        {mood === 'running' && (
-          <g stroke="#B45309" strokeWidth="3" strokeLinecap="round">
-            <path d="M38 50 L50 53" />
-            <path d="M82 50 L70 53" />
-          </g>
-        )}
+            {/* focused eyebrows while a session is running */}
+            {mood === 'running' && (
+              <g stroke="#B45309" strokeWidth="3" strokeLinecap="round">
+                <path d="M38 50 L50 53" />
+                <path d="M82 50 L70 53" />
+              </g>
+            )}
 
-        {/* tears */}
-        {sad && (
-          <g fill="#38BDF8">
-            <path className="mascot-tear mascot-tear-left" d="M45 68 q3 5 0 9 q-3 -4 0 -9z" />
-            <path className="mascot-tear mascot-tear-right" d="M75 68 q3 5 0 9 q-3 -4 0 -9z" />
-          </g>
-        )}
+            {/* tears */}
+            {sad && (
+              <g fill="#38BDF8">
+                <path className="mascot-tear mascot-tear-left" d="M45 68 q3 5 0 9 q-3 -4 0 -9z" />
+                <path className="mascot-tear mascot-tear-right" d="M75 68 q3 5 0 9 q-3 -4 0 -9z" />
+              </g>
+            )}
 
-        {/* mouth */}
-        <g transform={`translate(0 ${MOUTH_DY[variant] ?? 0})`}>
-        {happy ? (
-          <g>
-            <path d="M50 76 Q60 94 70 76 Z" fill="#1E293B" />
-            <ellipse cx="60" cy="84" rx="6" ry="3.5" fill="#F87171" />
-          </g>
-        ) : sad ? (
-          <path
-            d="M50 86 Q60 78 70 86"
-            stroke="#1E293B"
-            strokeWidth="4"
-            strokeLinecap="round"
-            fill="none"
-          />
-        ) : mood === 'running' ? (
-          <path d="M54 82 L66 82" stroke="#1E293B" strokeWidth="4" strokeLinecap="round" />
-        ) : variant === 'cat' ? (
-          /* cats get the classic tiny "w" mouth */
-          <path
-            d="M54 84 Q57 87 60 84 Q63 87 66 84"
-            stroke="#1E293B"
-            strokeWidth="3.5"
-            strokeLinecap="round"
-            fill="none"
-          />
+            {/* mouth */}
+            <g transform={`translate(0 ${MOUTH_DY[variant] ?? 0})`}>
+              {happy ? (
+                <g>
+                  <path d="M50 76 Q60 94 70 76 Z" fill="#1E293B" />
+                  <ellipse cx="60" cy="84" rx="6" ry="3.5" fill="#F87171" />
+                </g>
+              ) : sad ? (
+                <path
+                  d="M50 86 Q60 78 70 86"
+                  stroke="#1E293B"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  fill="none"
+                />
+              ) : mood === 'running' ? (
+                <path d="M54 82 L66 82" stroke="#1E293B" strokeWidth="4" strokeLinecap="round" />
+              ) : variant === 'cat' ? (
+                /* cats get the classic tiny "w" mouth */
+                <path
+                  d="M54 84 Q57 87 60 84 Q63 87 66 84"
+                  stroke="#1E293B"
+                  strokeWidth="3.5"
+                  strokeLinecap="round"
+                  fill="none"
+                />
+              ) : (
+                <path d="M52 80 Q60 87 68 80" stroke="#1E293B" strokeWidth="4" strokeLinecap="round" fill="none" />
+              )}
+            </g>
+          </svg>
         ) : (
-          <path d="M52 80 Q60 87 68 80" stroke="#1E293B" strokeWidth="4" strokeLinecap="round" fill="none" />
+          <Image
+            src={`/pets/${variant}.webp`}
+            alt=""
+            width={1024}
+            height={1024}
+            sizes="100vw"
+            unoptimized
+            draggable={false}
+            decoding="async"
+            loading={still ? 'lazy' : 'eager'}
+            onError={() => setImageFailed(true)}
+            className={`mascot-portrait h-full w-full select-none object-contain ${sad ? 'mascot-portrait-sad' : ''}`}
+          />
         )}
-        </g>
 
-        {/* equipped cosmetic accessory (on top of everything) */}
-        {accessory && ACCESSORIES[accessory]}
-      </svg>
+        {sad && !imageFailed && <span className="mascot-portrait-tear mascot-portrait-tear-left" />}
+        {sad && !imageFailed && <span className="mascot-portrait-tear mascot-portrait-tear-right" />}
+        {accessory && (
+          <svg viewBox="0 0 120 120" className="pointer-events-none absolute inset-0 h-full w-full overflow-visible" aria-hidden="true">
+            {ACCESSORIES[accessory]}
+          </svg>
+        )}
+      </div>
 
       {/* Self-contained animation styles (unique mascot-* prefix) */}
       <style>{`
         .mascot-breathe {
           animation: mascotBreathe 3.2s ease-in-out infinite;
           transform-origin: 50% 70%;
+        }
+        .mascot-portrait-sad { filter: saturate(0.74); }
+        .mascot-portrait-tear {
+          position: absolute;
+          top: 53%;
+          width: 5px;
+          height: 8px;
+          border-radius: 80% 20% 60% 50%;
+          background: #38BDF8;
+          box-shadow: 0 1px 2px rgba(14, 165, 233, 0.25);
+          animation: mascotPortraitTear 1.1s ease-in infinite;
+        }
+        .mascot-portrait-tear-left { left: 34%; transform: rotate(20deg); }
+        .mascot-portrait-tear-right { right: 34%; transform: rotate(-20deg); animation-delay: 0.55s; }
+        @keyframes mascotPortraitTear {
+          0% { opacity: 0; translate: 0 -3px; }
+          18%, 72% { opacity: 1; }
+          100% { opacity: 0; translate: 0 12px; }
         }
         @keyframes mascotBreathe {
           0%, 100% { transform: scale(1); }

@@ -1,221 +1,278 @@
-# Focus Tracker — Design System
+---
+name: Focus Tracker
+description: A calm blue-and-white field guide to focused time and small wins.
+colors:
+  primary: "#1766F3"
+  primary-deep: "#0052DB"
+  sky: "#0EA5E9"
+  ice: "#F0F9FF"
+  ice-soft: "#E0F2FE"
+  canvas: "#F7FBFF"
+  paper: "#FFFFFF"
+  ink: "#10233F"
+  muted-ink: "#53677F"
+  line: "#DFEAF5"
+  success: "#047857"
+  warning: "#B45309"
+typography:
+  display:
+    fontFamily: "Roboto Flex, Roboto, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: "30px"
+    fontWeight: 900
+    lineHeight: 1.1
+    letterSpacing: "-0.025em"
+  headline:
+    fontFamily: "Roboto Flex, Roboto, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: "24px"
+    fontWeight: 900
+    lineHeight: 1.2
+  title:
+    fontFamily: "Roboto Flex, Roboto, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: "16px"
+    fontWeight: 800
+    lineHeight: 1.35
+  body:
+    fontFamily: "Roboto Flex, Roboto, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: "14px"
+    fontWeight: 400
+    lineHeight: 1.55
+  label:
+    fontFamily: "Roboto Flex, Roboto, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: "10px"
+    fontWeight: 850
+    lineHeight: 1.35
+    letterSpacing: "0.16em"
+rounded:
+  sm: "8px"
+  md: "12px"
+  lg: "16px"
+  panel: "22px"
+  hero: "24px"
+  pill: "9999px"
+spacing:
+  xs: "4px"
+  sm: "8px"
+  md: "12px"
+  lg: "16px"
+  xl: "24px"
+components:
+  button-primary:
+    backgroundColor: "{colors.primary-deep}"
+    textColor: "{colors.paper}"
+    rounded: "{rounded.lg}"
+    padding: "16px 24px"
+  button-secondary:
+    backgroundColor: "{colors.paper}"
+    textColor: "{colors.primary-deep}"
+    rounded: "{rounded.md}"
+    padding: "12px 16px"
+    height: "44px"
+  card-panel:
+    backgroundColor: "rgba(255, 255, 255, 0.74)"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.panel}"
+    padding: "16px"
+  waypoint:
+    backgroundColor: "{colors.ice}"
+    textColor: "{colors.primary-deep}"
+    rounded: "{rounded.md}"
+    padding: "12px"
+---
 
-The visual authority for this app. Derived from the shipped implementation
-(v6, forest removed, SVG icon system in place). Update it when the system
-changes, not to describe intentions.
+# Design System: Focus Tracker
 
-## What this is
+## Overview
 
-A friendly focus buddy. You set the phone down and focus alongside a pet, and
-focusing earns you the pets themselves. The product's mechanism is **the
-collection is the progression**: every minute of focused time is progress
-toward meeting the next animal.
+**Creative North Star: "Field Guide of Small Wins"**
 
-The surface mode is **Operate** — the visitor is completing a task (start a
-session, keep a streak, grow a collection). Ambition shows as precision and
-restraint, not as expression. Brand lives in exact details.
+Focus Tracker treats a focus session as a small step along a personal trail. A
+cool white and ice-blue canvas keeps the app quiet, while cobalt route marks
+connect today's focus to the next pet portrait. The field-guide character comes
+from clear labels, compact milestone details, and original animal artwork—not
+from paper textures or a dense illustrated map.
 
-## Surface & light
+Roboto Flex gives the screens a compact, sturdy voice. Familiar mobile controls
+stay easy to scan and reach. A cool sky wash sits behind softly frosted white
+panels across the app, with brighter glass on the focus surface and companion
+stage. Fine white edges and diffuse blue shadows keep the layers light. The
+bottom navigation stays translucent as native chrome.
 
-Phones and tablets, held at arm's length, often in the evening (the streak
-reminder fires at 20:00). Light mode only. The ground is a sky wash
-(`--sky-50` → white) so the app reads as calm daylight rather than a dark
-productivity tool.
+**Key Characteristics:**
 
-## Color
+- A blue waypoint links focus progress and the next companion.
+- Original soft-sculpted 3D portraits give all 22 pets one visual family.
+- White panels and subtle depth keep the interface open and legible.
+- Cobalt actions, route marks, and tab selection carry the brand.
 
-Four themes, each swapping the whole `brand-*` and `sky-*` ramps via
-`data-theme` on the root. Tokens live in `styles/global.css` as **RGB
-triplets** consumed through Tailwind (`rgb(var(--brand-600) / <alpha-value>)`),
-so alpha utilities work and every theme re-colors automatically.
+## Colors
 
-| Theme    | Brand ramp anchor | Character |
-| -------- | ----------------- | --------- |
-| `blue`   | `#1A6DFF`         | default, sky |
-| `pink`   | `#E11D48`         | rose |
-| `purple` | `#7C3AED`         | violet |
-| `emerald`| `#059669`         | green |
+The base theme uses cobalt and white over an ice-blue wash. The user can also
+select pink, purple, or emerald themes; those themes replace the `brand-*` and
+`sky-*` ramps through `data-theme` while semantic success, warning, and urgent
+states keep their own hues.
 
-Rules that hold across themes:
+### Primary
 
-- **Never hard-code a brand hex in a component.** Use `brand-*` / `sky-*`
-  utilities so the theme swap is total.
-- Semantic colors stay fixed regardless of theme: amber = streak/attention,
-  emerald = success/claimable, red = urgency badge, slate = neutral text.
-- Text on a brand gradient is white; secondary text on that surface is
-  `text-white/75` — tinted from the hue, never gray.
-- Micro-labels use `tracking-widest` uppercase at 10–11px, `font-black`.
+- **Cobalt** (`colors.primary`): brand identity, focus progress, and selected
+  controls.
+- **Deep cobalt** (`colors.primary-deep`): high-contrast primary actions and
+  waypoint emphasis.
+- **Clear sky** (`colors.sky`): supporting blue accents and progress ramps.
 
-## Type
+### Neutral
 
-One family: **Roboto Flex**, self-hosted through `next/font` as
-`--font-roboto`, declared in `lib/gameState`'s consumer `styles/variables.css`
-as `--ion-font-family`. Variable weight covers 400–900 without faux-bold.
+- **Ice** (`colors.ice`, `colors.ice-soft`): calm page washes and secondary
+  control surfaces.
+- **Canvas** (`colors.canvas`) and **paper** (`colors.paper`): app background
+  and raised panels.
+- **Ink** (`colors.ink`) and **muted ink** (`colors.muted-ink`): primary and
+  supporting text.
+- **Line** (`colors.line`): quiet separators and panel outlines.
+- **Success** (`colors.success`) and **warm warning** (`colors.warning`):
+  completion and attention states.
 
-- Display / numbers: `font-black` + `tabular-nums`. Never proportional figures
-  in a counter or a stat tile — they jitter as they tick.
-- Body: 12–14px, `leading-relaxed` inside cards.
-- **10px is the floor.** Nothing in the UI goes below it. Uppercase section
-  labels are 11px.
-- Headings carry their own weight: no eyebrow/kicker labels above them.
+### Named Rules
 
-## Icons
+**The Waypoint Rule.** Cobalt marks the next action and the route toward the
+next companion. Warm warning and success colors stay attached to their
+meanings instead of becoming extra brand accents.
 
-`components/Icon.tsx` is the only icon system. ~35 hand-authored glyphs, all on
-one **24×24 grid**, `stroke-width: 2`, round caps and joins, `fill: none`,
-`stroke: currentColor`.
+## Typography
 
-- **Colour is layered, not inherited flat.** A stroke-only glyph that just takes
-  `currentColor` is too quiet: coin, flame and chart all collapse into the same
-  grey outline, which is what flattened the app when the emoji came out. So
-  every representational glyph carries an **identity hue** in the `IDENTITY`
-  map — coin gold, flame orange, paw violet, freeze ice-blue, sprout green — and
-  can sit on a tinted **plate**. Chrome (chevrons, close, the tab bar) has no
-  identity and keeps inheriting, because a permanently blue chevron is noise.
-- Resolution order, first match wins: explicit `tone` prop → a `text-*` colour
-  already in `className` → the glyph's identity hue → `currentColor`. The
-  `className` rung exists so a caller that deliberately mutes a glyph still can.
-- **On a saturated surface, pass `tone="inherit"`.** Banners, the hero band, the
-  coin wallet and the reward toast sit on deep gradients or tinted pills; the
-  glyph must take white (or the surrounding tint) rather than its identity hue,
-  or it turns low-contrast mud.
-- `plate` wraps the glyph in a `bg-*-50` chip with a 1px `ring-*-100`, sized off
-  the glyph (`size + 2×clamp(4, size/2)`), and never a shadow — the card already
-  owns its elevation. Use it for section headers, so six cards are not six
-  identical grey glyphs.
-- Sizing scales the square via the `size` prop (default 20). Never pass
-  width/height classes — stroke weight stays optically constant.
-- Decorative icons beside visible text get no label (`aria-hidden` is the
-  default). Standalone icons pass `label`.
-- **There are no emoji in this product.** Emoji render as whatever font the OS
-  ships, ignore the palette, and differ across iOS/Android/Windows. The pet
-  illustrations and the accessory products are authored SVG for the same
-  reason.
+**Display Font:** Roboto Flex (with Roboto and system sans-serif fallbacks)
+**Body Font:** Roboto Flex (with Roboto and system sans-serif fallbacks)
+**Label/Mono Font:** Roboto Flex; tabular figures for timers and counters
 
-### Illustration
+**Character:** Compact, direct, and friendly. Variable weights create a clear
+step from heavy headings to relaxed supporting copy without introducing a
+second font voice.
 
-- **Pets** (`components/Mascot.tsx`): 22 species, each authored on a 120×120
-  grid sharing one construction — a centered 40r head at (60,64), a shared eye
-  pair at (45,60)/(75,60), shared blush at (37,78)/(83,78), and per-species
-  `MOUTH_DY` offsets. Four moods (idle/running/happy/sad) re-use those shared
-  features, so every animal reads as one family. New pets must follow the grid,
-  not invent positions.
-- **Accessories** (`components/AccessoryShop.tsx`): 32×32 filled product art
-  with a darker edge and a light catch, so each reads as an object at 30px.
-  These are products, not icons — filled, not stroked, and carrying their own
-  literal colours (pink flower, red bow, violet hat, blue cap, gold crown)
-  rather than `currentColor`. They replace emoji objects, so they keep the
-  object's real hue instead of following the theme.
+### Hierarchy
+
+- **Display** (900, 30px, 1.1): top-level Home and Rewards headlines.
+- **Headline** (900, 24px, 1.2): the Focus page title and primary result
+  messages.
+- **Title** (800, 16px, 1.35): pet names and grouped section titles.
+- **Body** (400, 14px, 1.55): instructions and explanatory copy.
+- **Label** (850, 10px, 1.35, widely tracked uppercase): field notes, section
+  labels, and compact status metadata.
+
+Timer values and changing counters use tabular numerals. Small labels remain
+secondary to the action and its status.
 
 ## Layout
 
-- Three tabs: Home, Focus, Rewards (`components/TabBar.tsx`). The tab bar is
-  centered in a `max-w-md` so tablets don't fling the targets to the corners.
-- **Home answers "where am I"; Rewards is where you claim and collect.** Home
-  is the streak band (headline number + today's focus bar), one streak
-  protection card, the pet, the week, and a single link to Rewards. It carries
-  no shop, no claim button, and no advertising carousel — the rotating banner
-  row that used to sit here advertised features one tab away and pushed the
-  streak below the fold.
-- **The streak number appears once per screen.** The hero band owns it; the
-  protection card owns the shield state; the pet card is about the pet. Three
-  cards each restating "4 days" made the page stutter.
-- **Rewards has two tabs: Claim and Collect.** Claim gives the focus goal,
-  streak check-in, and daily gift separate sections because each has different
-  eligibility. The daily gift is available once per calendar day without
-  focusing; streak check-ins require a focus session and advance once per day.
-  Achievements and the pet collection follow. Collect holds the accessory and
-  theme shops. A single scroll that mixed a wallet, two shops, 22 pets, and 18
-  badges had no hierarchy at all.
-- **Claim sections span the full width.** The seven check-in cells need enough
-  room to clear the 44px tap minimum; a half-width tablet column squeezed them
-  below that target at every viewport ≥768px.
-- Pages live in a horizontally swipeable snap carousel; the tab bar and swipe
-  both drive it. A vertical swipe must never change tab (verified in
-  `tests/gallery/gesture.js`).
-- Content wrappers: `max-w-md` on phones, `md:max-w-3xl` / `lg:max-w-4xl` on
-  wider, **always with `mx-auto`**. Without it content hugs the left edge on
-  every screen ≥600px — this was a real shipped bug.
-- Two-column layouts start at `md`. Tablet columns must be balanced in height;
-  do not leave a tall empty gutter.
-- The shell is `100dvh` with `100vh` fallback; safe-area insets are applied
-  through `env()` on the page wrappers and the tab bar.
+The app keeps three horizontally swipeable destinations—Home, Focus, and
+Rewards—with a centered bottom tab bar. Focus is the main task surface. Its
+header uses a target glyph as a focus marker; it is not an ordinal step. Home
+shows the current streak and today's progress, then the pet and next waypoint.
+Rewards separates Claim from Collect so claimable progress stays distinct from
+the pet, accessory, and theme collections.
 
-## Streak protection
+Phone content is centered in a narrow column. Wider screens expand to a
+balanced two-column composition, with claim strips kept wide enough for their
+touch targets. The shell follows the visible viewport (`100dvh`, with a `vh`
+fallback); page wrappers and the tab bar respect iOS and Android safe-area
+insets. Narrow check-in rows wrap to preserve a 44px minimum target.
 
-Two ways to survive a miss, and they are **one decision seen from two sides**:
-a shield is paid *before* a miss, a repair is paid *after* one. They live in a
-single `StreakCard` and it offers exactly one action — the one available now,
-in this priority: repair (amber) → shield held (sky, no button) → add a shield
-(sky) → nothing purchasable, with a one-line reason.
+## Elevation & Depth
 
-- **One shield, not a stock.** `STREAK_FREEZE_MAX = 1`. A stock only paid out
-  when it covered the *whole* gap, which could not be stated in a card.
-- The buy predicate is `canBuyStreakFreeze`, and both the card and the purchase
-  read it. A second copy of that rule in the component is how the UI ended up
-  offering shields the engine refused.
-- Retired saves holding 2–3 shields keep one and are refunded
-  `STREAK_FREEZE_COST` for the rest. A count the old shop could never have sold
-  is treated as corruption: capped, no refund, so a damaged save cannot mint
-  coins.
+The system is layered and quiet: grouped white panels use a softly translucent
+glass treatment over a pale sky-blue wash, with a fine bright edge and diffuse
+blue shadow. The focus surface and companion stage get a slightly deeper glass
+layer to frame the active task and pet art. Dense controls and text fields stay
+more opaque for clarity. Bottom navigation uses translucent white and blur as
+native chrome. The segmented Rewards control uses a frosted base and a
+deep-blue selected state.
 
-## Touch
+## Shapes
 
-- **44×44 minimum** for anything interactive. Disabled controls are exempt
-  (they aren't tappable).
-- Where seven cells genuinely cannot each reach 44px (the 7-day check-in strip),
-  the strip wraps to 4+3. Seven cells need 332px of content width
-  (`7×44 + 6×4` gap), which is a **400px viewport** once page and card padding
-  are added — so the breakpoint is `min-[400px]`, not `min-[360px]`. The
-  earlier 360px breakpoint shipped 39–41px cells and was wrong in the doc.
-- Hover is never load-bearing. Feedback is `active:scale-*` plus haptics on
-  native.
+Panels use a soft, generous radius (about 22px); focus and result surfaces use
+24–32px corners. Inner tiles and controls step down to 12–16px, while compact
+wallet and streak indicators use full pills. Pet portraits stay cut out over a
+soft orbital glow. Route lines are thin and dotted, with circular waypoint
+marks rather than numbered stages.
 
-## Cards & depth
+## Components
 
-- One elevation per element: either a `1px` slate border **or** a soft shadow.
-  Never both on the same card (that's the ghost-card tell).
-- Radii: `rounded-2xl` (16px) for cards, `rounded-xl` (12px) for inner tiles,
-  `rounded-lg` for controls. Pills are only for small chips/counters.
-- Cards are for genuinely grouped content. Do not nest cards inside cards, and
-  do not reduce every section to an identical icon-heading-text card.
+### Buttons
 
-## Motion
+Primary actions are deep cobalt with white type and a generous hit area. The
+focus action and retry action use the same primary treatment; successful
+completion and available purchases use semantic success or warm-warning
+surfaces. Secondary actions use a white fill, fine outline, and cobalt label.
+Press states are immediate and restrained; keyboard focus gets a visible
+three-pixel brand outline.
 
-- One authored moment per event, not scattered effects: the stat pop, the
-  confetti burst on a milestone, the drift of clouds.
-- `prefers-reduced-motion: reduce` kills all of it globally in `global.css`.
-- Exponential/gentle ease-out. The game's celebratory pops use a slight
-  overshoot — that is a deliberate, kept trait of this playful product, not a
-  default to copy into new chrome.
+### Chips
 
-## Copy
+Small streak, wallet, and cycle indicators use rounded pills with a pale tinted
+fill. Their icon and text remain paired so status is not communicated by color
+alone.
 
-- Second person, warm, specific. The pet is named in the sentence
-  ("Bear is ready to focus with you"), not described generically.
-- Controls name their action: "Start focus", "Buy 60", "Claim reward".
-- Numbers carry their unit or symbol via an icon, not an emoji
-  (`<Icon name="coin" /> 140`, not `140 🪙`).
+### Cards / Containers
 
-## Accessibility
+Grouped sections use frosted white panels with a fine bright outline, a subtle
+blue shadow, and 16px internal spacing. Focus and companion panels use a
+slightly stronger glass layer. Pet tiles and shop items use a smaller radius;
+active and locked states use a restrained blue fill or dashed outline.
 
-- Every control has an accessible name; icon-only buttons get `aria-label`.
-- Progress bars expose `role="progressbar"` with `aria-valuenow`.
-- Live regions announce rewards (`role="status" aria-live="polite"`).
-- Focus is visible: `focus-visible:outline-2 outline-offset-2`.
-- Body text meets 4.5:1; large text 3:1. Never communicate state by color
-  alone — pair it with an icon or a word.
+### Inputs / Fields
 
-## Verification
+The custom-duration editor uses numeric inputs on a white fill with a cool
+outline, centered figures, and a clear focus ring. The two inputs remain
+reachable on narrow phones, alongside a 44px Set control.
 
-Changing UI means running all four:
+### Navigation
 
-1. `npm test` — engine + migration coverage.
-2. `node tests/gallery/audit.js <tab>` — 17 viewports incl. phone landscape;
-   fails on clipping, overflow, and sub-44px targets.
-3. `node tests/gallery/scroll.js <tab>` — nothing trapped in the fixed shell.
-4. `node tests/gallery/gesture.js` — carousel and banner swipes.
-5. `node tests/gallery/emoji-scan.js` — must report 0 lines.
+The bottom bar is a translucent white surface with three centered, 44px-minimum
+targets. The active tab uses a cobalt icon and a pale-blue capsule; the reward
+dot appears only when something is claimable. During an active focus session,
+navigation remains disabled.
 
-Emulated viewports prove layout, never gestures; Chromium is not Safari. Name
-what stayed untested rather than implying device coverage.
+### Waypoint
+
+The focus screen and pet progress card use a slim dotted rail, a solid cobalt
+marker, a next-pet label, and the remaining focus goal. This connects progress
+to the next unlock without adding a numbered step sequence.
+
+### Pet Portraits
+
+`components/Mascot.tsx` loads the 22 original square WebP portraits from
+`public/pets/`. The portraits share a friendly soft-sculpted 3D treatment,
+species-accurate colors, and a white background. The component keeps the
+existing idle, running, happy, and sad motion, celebration burst, and accessory
+overlays. New portraits should match the same lighting, centered framing, and
+readability at small sizes.
+
+### Icons and Launch Art
+
+`components/Icon.tsx` remains the interface icon system: custom SVG glyphs with
+a consistent 24px grid and stroke treatment. The app mark uses a bear portrait
+inside a cobalt focus waypoint. The favicon, PWA icons, Apple touch icon, iOS
+app icon, Android adaptive icons, and native splash images use that mark and
+the same blue-and-white field-guide world. Android and iOS splash variants also
+include dark-appearance artwork; the in-app UI remains light.
+
+## Do's and Don'ts
+
+### Do:
+
+- **Do** keep cobalt and white as the default identity; use the theme ramps for
+  theme-aware controls.
+- **Do** show the next pet and the remaining goal wherever a waypoint appears.
+- **Do** use soft white glass across grouped surfaces, with stronger blur only
+  where the sky wash remains visible behind it.
+- **Do** preserve 44px interactive targets, safe-area insets, visible keyboard
+  focus, and reduced-motion behavior.
+- **Do** use the supplied portrait family and authored SVG icons instead of
+  platform-dependent emoji.
+
+### Don't:
+
+- **Don't** add numbered stage markers to the Focus header; its target glyph is
+  a focus marker, not a step number.
+- **Don't** blur dense inner controls or fields; keep them clear and readable.
+- **Don't** use emoji as interface icons or pet substitutes.
+- **Don't** introduce a second illustration style into the pet collection.
+- **Don't** use color alone to explain a claim, lock, success, or warning state.

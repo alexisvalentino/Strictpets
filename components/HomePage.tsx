@@ -3,30 +3,26 @@ import Icon from './Icon';
 import MascotCard from './MascotCard';
 import StreakCard from './StreakCard';
 import HistoryCard from './HistoryCard';
-import { DAILY_GOAL, type AccessoryId, type FocusLogEntry, type MascotId, type PetInfo } from '../lib/gameState';
+import { DAILY_GOAL, type AccessoryId, type FocusLogEntry, type MascotId, type PetInfo, type PetSceneId } from '../lib/gameState';
 
-// Home is the "where am I" page: the streak you are holding, the one number
-// that moves today, your pet, and your week. Everything that is a destination
-// or a purchase lives on Rewards — this page used to carry a rotating banner
-// row advertising features that were one tab away, plus a second set of record
-// tiles duplicating Rewards' achievements card.
 interface HomePageProps {
   streak: number;
   bestStreak: number;
   nextPet: PetInfo | null;
   ownedPetCount: number;
-  week: FocusLogEntry[]; // last 7 days, oldest first
+  week: FocusLogEntry[];
   coins: number;
-  minutesToday: number; // focused minutes today (daily goal)
+  minutesToday: number;
   dailyGoalClaimed: boolean;
   shields: number;
   repairableStreak: number;
   canBuyShield: boolean;
   mascot: MascotId;
   accessory: AccessoryId | null;
+  petScene: PetSceneId;
   petName: string;
   totalSessions: number;
-  focusSeconds: number; // lifetime focused seconds
+  focusSeconds: number;
   onRepair: () => void;
   onBuyShield: () => void;
   onOpenRewards: () => void;
@@ -46,6 +42,7 @@ const HomePage = ({
   canBuyShield,
   mascot,
   accessory,
+  petScene,
   petName,
   totalSessions,
   focusSeconds,
@@ -54,106 +51,102 @@ const HomePage = ({
   onOpenRewards,
 }: HomePageProps) => {
   const goalPct = Math.min(100, (minutesToday / DAILY_GOAL) * 100);
-  const sessionsThisWeek = week.reduce((n, d) => n + d.sessions, 0);
-
   return (
     <div className="flex h-full w-full shrink-0 snap-start flex-col overflow-y-auto">
-      <div className="my-auto mx-auto w-full max-w-md px-4 py-6 pl-[max(1rem,var(--safe-area-left))] pr-[max(1rem,var(--safe-area-right))] sm:px-6 md:max-w-3xl">
-        <div className="md:grid md:grid-cols-2 md:items-start md:gap-x-6">
-          <div>
-            {/* the streak is the headline: one band, one number, one goal */}
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-sky-500 to-sky-400 p-5 text-left shadow-lg shadow-brand-600/25">
-              <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/10" />
-              <div className="absolute -bottom-12 -left-6 h-24 w-24 rounded-full bg-white/10" />
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/70">
-                {streak > 0 ? 'Your streak' : 'Focus Tracker'}
-              </p>
-              <p className="mt-1.5 flex items-baseline gap-2 text-3xl font-black tabular-nums text-white">
-                {streak > 0 ? (
-                  <>
-                    {streak}
-                    <span className="text-sm font-bold uppercase tracking-wide text-white/80">
-                      day{streak === 1 ? '' : 's'}
+      <main className="mx-auto w-full max-w-md px-4 py-6 pl-[max(1rem,var(--safe-area-left))] pr-[max(1rem,var(--safe-area-right))] sm:px-6 md:max-w-4xl">
+        <header className="mb-5">
+          <h1 className="text-[26px] font-black leading-tight tracking-tight text-slate-900">
+            This week
+          </h1>
+        </header>
+
+        <div className="md:grid md:grid-cols-[minmax(0,1.2fr)_minmax(300px,0.8fr)] md:items-start md:gap-5">
+          <HistoryCard days={week} />
+
+          <div className="md:pt-0">
+            <section className="guide-panel home-today-panel mt-4 rounded-[24px] p-4 text-slate-800 md:mt-0">
+              <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4">
+                <div className="min-w-[82px] border-r border-sky-200/80 pr-4">
+                  <p className="text-[11px] font-bold text-slate-600">Current streak</p>
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <Icon name="flame" size={19} className="shrink-0 text-amber-500" />
+                    <p className="text-2xl font-black leading-none tabular-nums text-brand-700">
+                      {streak}<span className="ml-1 text-xs font-bold">d</span>
+                    </p>
+                  </div>
+                  <p className="mt-1 text-[10px] font-semibold text-slate-500">Best {bestStreak}d</p>
+                </div>
+
+                <div className="min-w-0">
+                  <div className="flex items-baseline justify-between gap-2 text-xs font-bold text-slate-700">
+                    <span>Today&apos;s focus</span>
+                    <span className="shrink-0 tabular-nums text-slate-800">
+                      {minutesToday}/{DAILY_GOAL} min
                     </span>
-                  </>
-                ) : (
-                  <span className="text-2xl">Start today</span>
-                )}
-                <Icon name="flame" size={22} className="shrink-0 text-amber-200" />
-              </p>
-
-              {/* today's focus, the only number that moves the streak forward */}
-              <div className="mt-4">
-                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-white/80">
-                  <span>Today&apos;s focus</span>
-                  <span className="tabular-nums">
-                    {minutesToday}/{DAILY_GOAL} min
-                  </span>
-                </div>
-                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/25">
+                  </div>
                   <div
-                    className="h-full rounded-full bg-white transition-all duration-500"
-                    style={{ width: `${goalPct}%` }}
-                  />
+                    role="progressbar"
+                    aria-label="Today's focus goal"
+                    aria-valuemin={0}
+                    aria-valuemax={DAILY_GOAL}
+                    aria-valuenow={Math.min(minutesToday, DAILY_GOAL)}
+                    className="mt-2 h-2 overflow-hidden rounded-full bg-sky-100"
+                  >
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-sky-400 to-brand-600 transition-[width] duration-500 ease-out"
+                      style={{ width: `${goalPct}%` }}
+                    />
+                  </div>
+                  <p className="mt-2 text-[10px] font-semibold leading-relaxed text-slate-500">
+                    {dailyGoalClaimed
+                      ? 'Daily reward collected.'
+                      : goalPct >= 100
+                        ? `Your ${DAILY_GOAL}-minute goal is ready to claim.`
+                        : `${Math.max(0, DAILY_GOAL - minutesToday)} min to goal.`}
+                  </p>
                 </div>
-                <p className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-white/80">
-                  <Icon name="coin" size={12} className="shrink-0 text-amber-200" />
-                  {coins} focus coins
-                  {dailyGoalClaimed
-                    ? ' · daily goal claimed'
-                    : goalPct >= 100
-                      ? ' · daily goal ready on Rewards'
-                      : ''}
-                </p>
               </div>
-            </div>
-
-            <StreakCard
-              streak={streak}
-              bestStreak={bestStreak}
-              shields={shields}
-              repairableStreak={repairableStreak}
-              coins={coins}
-              canBuyShield={canBuyShield}
-              onBuyShield={onBuyShield}
-              onRepair={onRepair}
-            />
+              {!dailyGoalClaimed && goalPct >= 100 && (
+                <button
+                  onClick={onOpenRewards}
+                  className="mt-3 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r from-brand-700 to-sky-700 px-3 text-xs font-black text-white shadow-md shadow-brand-700/15 transition-transform active:scale-[0.98]"
+                >
+                  Claim your reward <Icon name="chevronRight" size={13} />
+                </button>
+              )}
+              <StreakCard
+                streak={streak}
+                shields={shields}
+                repairableStreak={repairableStreak}
+                coins={coins}
+                canBuyShield={canBuyShield}
+                tone="glass"
+                onBuyShield={onBuyShield}
+                onRepair={onRepair}
+              />
+            </section>
 
             <MascotCard
-              streak={streak}
               petName={petName}
               mascot={mascot}
               accessory={accessory}
+              scene={petScene}
               nextPet={nextPet}
               stats={{ focusSeconds, totalSessions, bestStreak }}
               ownedCount={ownedPetCount}
             />
-          </div>
 
-          <div>
-            <HistoryCard days={week} />
-
-            {/* one plain destination instead of a carousel of adverts */}
             <button
               onClick={onOpenRewards}
-              className="mt-3 flex w-full items-center gap-3 rounded-2xl border border-slate-200/70 bg-white p-4 text-left shadow-sm transition-transform active:scale-[0.99]"
+              className="mt-4 flex min-h-12 w-full items-center gap-3 border-y border-sky-200/70 px-1 text-left text-sm transition-colors active:text-brand-700"
             >
-              <Icon name="gift" size={16} plate />
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">
-                  Rewards
-                </p>
-                <p className="mt-0.5 text-[11px] font-semibold leading-relaxed text-slate-400">
-                  {sessionsThisWeek > 0
-                    ? `${sessionsThisWeek} session${sessionsThisWeek === 1 ? '' : 's'} this week · claim and collect there`
-                    : 'Daily goal, check-in jackpot, friends, and shops'}
-                </p>
-              </div>
-              <Icon name="chevronRight" size={14} className="shrink-0 text-slate-300" />
+              <Icon name="gift" size={18} className="shrink-0 text-brand-600" />
+              <span className="min-w-0 flex-1 font-bold text-slate-700">Rewards</span>
+              <Icon name="chevronRight" size={15} className="shrink-0 text-slate-400" />
             </button>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 };

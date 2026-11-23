@@ -59,9 +59,9 @@ export const RECORD_BONUS = 50; // coins for beating your longest session
 // --- Mascot accessories (cosmetics) ---
 export const ACCESSORY_CATALOG = [
   { id: 'flower', name: 'Flower', price: 60 },
-  { id: 'bow', name: 'Red Bow', price: 150 },
+  { id: 'scarf', name: 'Cozy Scarf', price: 150 },
   { id: 'party-hat', name: 'Party Hat', price: 220 },
-  { id: 'cap', name: 'Cap', price: 300 },
+  { id: 'halo', name: 'Star Halo', price: 300 },
   { id: 'sunglasses', name: 'Shades', price: 450 },
   { id: 'crown', name: 'Crown', price: 900 },
 ] as const;
@@ -71,14 +71,29 @@ export type AccessoryId = (typeof ACCESSORY_CATALOG)[number]['id'];
 export const isAccessoryId = (id: string): id is AccessoryId =>
   ACCESSORY_CATALOG.some(a => a.id === id);
 
+// Replace the two retired cosmetics in existing saves one-for-one. Their
+// ownership and equipped state carry forward to the new designs without
+// charging the player again or leaving an invalid accessory id behind.
+const LEGACY_ACCESSORY_REPLACEMENTS: Record<string, AccessoryId> = {
+  bow: 'scarf',
+  cap: 'halo',
+};
+
+const migrateAccessoryId = (value: unknown): AccessoryId | null => {
+  if (typeof value !== 'string') return null;
+  return isAccessoryId(value)
+    ? value
+    : LEGACY_ACCESSORY_REPLACEMENTS[value] ?? null;
+};
+
 // --- App themes (cosmetic) ---
 // The "blue" theme is the free default; the rest swap the brand/sky palette
 // via CSS variables (see styles/global.css `[data-theme]` blocks).
 export const THEME_CATALOG = [
-  { id: 'blue', name: 'Sky Blue', price: 0, swatch: ['#1A6DFF', '#38BDF8'] },
+  { id: 'blue', name: 'Sky Blue', price: 0, swatch: ['#1766F3', '#38BDF8'] },
   { id: 'pink', name: 'Rose Pink', price: 600, swatch: ['#E11D48', '#FB7185'] },
   { id: 'purple', name: 'Violet', price: 600, swatch: ['#7C3AED', '#A78BFA'] },
-  { id: 'emerald', name: 'Emerald', price: 600, swatch: ['#059669', '#34D399'] },
+  { id: 'emerald', name: 'Emerald', price: 600, swatch: ['#047F62', '#34D399'] },
 ] as const;
 
 export type ThemeId = (typeof THEME_CATALOG)[number]['id'];
@@ -86,10 +101,115 @@ export type ThemeId = (typeof THEME_CATALOG)[number]['id'];
 export const isThemeId = (id: string): id is ThemeId =>
   THEME_CATALOG.some(t => t.id === id);
 
+// --- Pet scenes (permanent cosmetic collection) ---
+// Thirty combinations create a longer runway for earned coins. Three unowned
+// scenes are featured each week; every scene returns, and purchases never
+// expire. The scene changes only the soft stage behind the pet artwork.
+export const PET_SCENE_PRICE = 900;
+export const PET_SCENE_WEEKLY_OFFERS = 3;
+const PET_SCENE_ROTATION_START = '2026-01-05'; // Monday; fixed for stable saves
+
+const PET_SCENE_MOTIFS = [
+  { id: 'clouds', label: 'Clouds' },
+  { id: 'meadow', label: 'Meadow' },
+  { id: 'moon', label: 'Moon' },
+  { id: 'ocean', label: 'Ocean' },
+  { id: 'blossoms', label: 'Blossoms' },
+] as const;
+
+const PET_SCENE_PALETTES = [
+  { id: 'sky', label: 'Sky', background: '#E6F6FF', base: '#B8E5FA', accent: '#70C4ED', detail: '#FFFFFF' },
+  { id: 'peach', label: 'Peach', background: '#FFF1E7', base: '#F8D0B4', accent: '#EAA879', detail: '#FFFDFC' },
+  { id: 'rose', label: 'Rose', background: '#FFF0F5', base: '#F3C4D5', accent: '#D986A8', detail: '#FFFFFF' },
+  { id: 'lavender', label: 'Lavender', background: '#F4F0FF', base: '#D6C9F5', accent: '#A995DE', detail: '#FFFFFF' },
+  { id: 'mint', label: 'Mint', background: '#EAF8F1', base: '#BFE8D3', accent: '#7BC6A4', detail: '#FFFFFF' },
+  { id: 'twilight', label: 'Twilight', background: '#243653', base: '#405A7D', accent: '#A9C8F0', detail: '#F5F8FF' },
+] as const;
+
+type PetSceneMotif = (typeof PET_SCENE_MOTIFS)[number]['id'];
+type PetScenePalette = (typeof PET_SCENE_PALETTES)[number]['id'];
+export type PetSceneId = 'classic' | `${PetSceneMotif}-${PetScenePalette}`;
+
+export interface PetSceneDefinition {
+  readonly id: PetSceneId;
+  readonly name: string;
+  readonly price: number;
+  readonly motif: PetSceneMotif | 'classic';
+  readonly palette: PetScenePalette;
+  readonly background: string;
+  readonly base: string;
+  readonly accent: string;
+  readonly detail: string;
+}
+
+const SKY_PALETTE = PET_SCENE_PALETTES[0];
+export const PET_SCENE_CATALOG: readonly PetSceneDefinition[] = [
+  {
+    id: 'classic',
+    name: 'Classic Sky',
+    price: 0,
+    motif: 'classic',
+    palette: SKY_PALETTE.id,
+    background: SKY_PALETTE.background,
+    base: SKY_PALETTE.base,
+    accent: SKY_PALETTE.accent,
+    detail: SKY_PALETTE.detail,
+  },
+  ...PET_SCENE_MOTIFS.flatMap(motif =>
+    PET_SCENE_PALETTES.map(palette => ({
+      id: `${motif.id}-${palette.id}` as PetSceneId,
+      name: `${palette.label} ${motif.label}`,
+      price: PET_SCENE_PRICE,
+      motif: motif.id,
+      palette: palette.id,
+      background: palette.background,
+      base: palette.base,
+      accent: palette.accent,
+      detail: palette.detail,
+    })),
+  ),
+];
+
+export const isPetSceneId = (id: string): id is PetSceneId =>
+  PET_SCENE_CATALOG.some(scene => scene.id === id);
+
+// Offers are pinned to the user's local Monday and a fixed epoch. Owned
+// scenes are skipped so a full wallet never gets stuck looking at purchases
+// already made. Items cycle back after ten weeks, with no expiry or FOMO.
+export const featuredPetScenes = (now: Date = new Date()): PetSceneDefinition[] => {
+  const paid = PET_SCENE_CATALOG.filter(scene => scene.price > 0);
+  const today = dateOrdinal(todayKey(now));
+  const anchor = dateOrdinal(PET_SCENE_ROTATION_START);
+  if (today === null || anchor === null || paid.length < PET_SCENE_WEEKLY_OFFERS) return [];
+
+  const weekday = new Date(today * 86400000).getUTCDay();
+  const mondayOrdinal = today - ((weekday + 6) % 7);
+  const week = Math.floor((mondayOrdinal - anchor) / 7);
+  const cycleWeeks = Math.ceil(paid.length / PET_SCENE_WEEKLY_OFFERS);
+  const cycleWeek = ((week % cycleWeeks) + cycleWeeks) % cycleWeeks;
+  const start = (cycleWeek * PET_SCENE_WEEKLY_OFFERS) % paid.length;
+  return Array.from({ length: Math.min(PET_SCENE_WEEKLY_OFFERS, paid.length) }, (_, index) =>
+    paid[(start + index) % paid.length],
+  );
+};
+
+export const petScenePrice = (id: PetSceneId, now: Date = new Date()): number => {
+  const item = PET_SCENE_CATALOG.find(scene => scene.id === id);
+  if (!item || item.price <= 0) return 0;
+  return featuredPetScenes(now).some(scene => scene.id === id)
+    ? Math.round(item.price * 0.75)
+    : item.price;
+};
+
+export type AppearanceMode = 'system' | 'light' | 'dark';
+
+export const isAppearanceMode = (value: unknown): value is AppearanceMode =>
+  value === 'system' || value === 'light' || value === 'dark';
+
 // --- Pet collection ---
 // Pets are EARNED by focusing, never bought. Each one unlocks from a lifetime
 // milestone: total focused minutes, completed sessions, or best streak. The
-// bear is the starter. Mixed goal kinds mean some friend is always close.
+// cat is the starter. Mixed goal kinds mean some friend is always close.
 export type PetUnlock =
   | { readonly kind: 'starter' }
   | { readonly kind: 'minutes' | 'sessions' | 'streak'; readonly value: number };
@@ -101,8 +221,8 @@ interface PetDef {
 }
 
 export const MASCOT_CATALOG = [
-  { id: 'bear', name: 'Bear', unlock: { kind: 'starter' } },
-  { id: 'cat', name: 'Cat', unlock: { kind: 'sessions', value: 1 } },
+  { id: 'cat', name: 'Cat', unlock: { kind: 'starter' } },
+  { id: 'bear', name: 'Bear', unlock: { kind: 'sessions', value: 1 } },
   { id: 'chick', name: 'Chick', unlock: { kind: 'minutes', value: 15 } },
   { id: 'frog', name: 'Frog', unlock: { kind: 'minutes', value: 30 } },
   { id: 'rabbit', name: 'Rabbit', unlock: { kind: 'minutes', value: 60 } },
@@ -249,6 +369,9 @@ export interface GameState {
   focusSeconds: number; // lifetime focused seconds (every completed session, in full)
   ownedThemes: ThemeId[]; // themes bought (blue is always owned)
   activeTheme: ThemeId; // the one applied to the whole app
+  ownedPetScenes: PetSceneId[]; // permanent pet stage cosmetics
+  equippedPetScene: PetSceneId; // background stage shown behind the active pet
+  appearanceMode: AppearanceMode; // light/dark appearance, independent of accent theme
   longestSession: number; // longest completed session in seconds (record)
   recordBonusDate: string | null; // date the once-per-day record bonus was paid
   totalSessions: number; // completed sessions of all time
@@ -276,14 +399,17 @@ export const defaultGameState = (): GameState => ({
   dailyGoalClaimed: false,
   dailyBonusDate: null,
   claimedDays: [],
-  ownedMascots: ['bear'],
-  activeMascot: 'bear',
+  ownedMascots: ['cat'],
+  activeMascot: 'cat',
   ownedAccessories: [],
   equippedAccessory: null,
   streakFreezes: 0,
   focusSeconds: 0,
   ownedThemes: ['blue'],
   activeTheme: 'blue',
+  ownedPetScenes: ['classic'],
+  equippedPetScene: 'classic',
+  appearanceMode: 'system',
   longestSession: 0,
   recordBonusDate: null,
   totalSessions: 0,
@@ -400,27 +526,41 @@ export const loadGameState = (): GameState => {
     }
     const parsed = value as Partial<GameState>;
     // Coerce mascot fields so older saves (without them) get sane defaults.
-    const ownedMascots: MascotId[] = Array.from(
-      new Set<MascotId>([
-        'bear',
-        ...(Array.isArray(parsed.ownedMascots)
-          ? parsed.ownedMascots.filter(isMascotId)
-          : []),
-      ]),
-    );
-    const storedActive = parsed.activeMascot;
-    const activeMascot: MascotId =
-      storedActive && isMascotId(storedActive) && ownedMascots.includes(storedActive)
-        ? storedActive
-        : (ownedMascots[0] ?? 'bear');
-    const ownedAccessories: AccessoryId[] = Array.isArray(parsed.ownedAccessories)
-      ? Array.from(new Set(parsed.ownedAccessories.filter(isAccessoryId)))
+    const savedMascots = Array.isArray(parsed.ownedMascots)
+      ? parsed.ownedMascots.filter(isMascotId)
       : [];
+    const ownedMascotSet = new Set<MascotId>(['cat', ...savedMascots]);
+    const ownedMascots = MASCOT_CATALOG
+      .filter(m => ownedMascotSet.has(m.id))
+      .map(m => m.id);
+    const storedActive = parsed.activeMascot;
+    // The previous shipped default save contained only Bear and no focus
+    // history. Give that untouched starter save the new Cat starter; a player
+    // who has focused or collected other pets keeps their chosen companion.
+    const legacyDefaultBear =
+      storedActive === 'bear' &&
+      savedMascots.length === 1 &&
+      savedMascots[0] === 'bear' &&
+      safeInt(parsed.totalSessions) === 0 &&
+      lifetimeFocusSeconds(parsed) === 0;
+    const activeMascot: MascotId =
+      !legacyDefaultBear &&
+      storedActive &&
+      isMascotId(storedActive) &&
+      ownedMascots.includes(storedActive)
+        ? storedActive
+        : (ownedMascots[0] ?? 'cat');
+    const ownedAccessories: AccessoryId[] = Array.isArray(parsed.ownedAccessories)
+      ? Array.from(new Set(
+          parsed.ownedAccessories
+            .map(migrateAccessoryId)
+            .filter((id): id is AccessoryId => id !== null),
+        ))
+      : [];
+    const storedAccessory = migrateAccessoryId(parsed.equippedAccessory);
     const equippedAccessory: AccessoryId | null =
-      parsed.equippedAccessory &&
-      isAccessoryId(parsed.equippedAccessory) &&
-      ownedAccessories.includes(parsed.equippedAccessory)
-        ? parsed.equippedAccessory
+      storedAccessory && ownedAccessories.includes(storedAccessory)
+        ? storedAccessory
         : null;
     const ownedThemes: ThemeId[] = Array.isArray(parsed.ownedThemes)
       ? Array.from(new Set<ThemeId>(['blue', ...parsed.ownedThemes.filter(isThemeId)]))
@@ -430,6 +570,25 @@ export const loadGameState = (): GameState => {
       storedTheme && isThemeId(storedTheme) && ownedThemes.includes(storedTheme)
         ? storedTheme
         : 'blue';
+    const ownedPetSceneSet = new Set<PetSceneId>(['classic']);
+    if (Array.isArray(parsed.ownedPetScenes)) {
+      for (const id of parsed.ownedPetScenes) {
+        if (typeof id === 'string' && isPetSceneId(id)) ownedPetSceneSet.add(id);
+      }
+    }
+    const ownedPetScenes = PET_SCENE_CATALOG
+      .filter(scene => ownedPetSceneSet.has(scene.id))
+      .map(scene => scene.id);
+    const storedPetScene = parsed.equippedPetScene;
+    const equippedPetScene: PetSceneId =
+      typeof storedPetScene === 'string' &&
+      isPetSceneId(storedPetScene) &&
+      ownedPetScenes.includes(storedPetScene)
+        ? storedPetScene
+        : 'classic';
+    const appearanceMode: AppearanceMode = isAppearanceMode(parsed.appearanceMode)
+      ? parsed.appearanceMode
+      : 'system';
     // Older saves used lastFocusDate for both streaks and daily counters.
     const lastFocusDate = validDateKey(parsed.lastFocusDate);
     const dailyProgressDate =
@@ -470,6 +629,9 @@ export const loadGameState = (): GameState => {
       focusSeconds: lifetimeFocusSeconds(parsed),
       ownedThemes,
       activeTheme,
+      ownedPetScenes,
+      equippedPetScene,
+      appearanceMode,
       longestSession: safeInt(parsed.longestSession, MAX_SESSION_SECONDS),
       recordBonusDate: validDateKey(parsed.recordBonusDate),
       totalSessions,
@@ -535,8 +697,9 @@ export const consumeInterruptedSession = (): boolean => {
   }
 };
 
-// A streak can remain in storage during the one-day paid-repair window, but it
-// must not be shown as active unless its gap is already covered by freezes.
+// Keep a streak visible through the one-missed-day repair window so its repair
+// action stays attached to the saved streak. Beyond that, only freezes keep it
+// visible while they cover every missed day.
 export const activeStreak = (s: GameState, now: Date = new Date()): number => {
   if (s.currentStreak === 0 || s.lastFocusDate === null) return 0;
   const gap = daysBetween(s.lastFocusDate, todayKey(now));
@@ -1228,6 +1391,50 @@ export const equipTheme = (
     return { state: s, ok: false };
   }
   return { state: { ...s, activeTheme: id }, ok: true };
+};
+
+// Buy any scene at list price, or at the rotating weekly featured discount.
+// Ownership is permanent, and a purchase applies the scene immediately.
+export const buyPetScene = (
+  prev: GameState,
+  id: PetSceneId,
+  now: Date = new Date(),
+): { state: GameState; ok: boolean; cost: number } => {
+  const s = normalizeForToday(prev, now);
+  const item = PET_SCENE_CATALOG.find(scene => scene.id === id);
+  const cost = item ? petScenePrice(id, now) : 0;
+  if (!item || item.price <= 0 || s.ownedPetScenes.includes(id) || s.coins < cost) {
+    return { state: s, ok: false, cost };
+  }
+  return {
+    state: {
+      ...s,
+      coins: s.coins - cost,
+      ownedPetScenes: [...s.ownedPetScenes, id],
+      equippedPetScene: id,
+    },
+    ok: true,
+    cost,
+  };
+};
+
+export const equipPetScene = (
+  prev: GameState,
+  id: PetSceneId,
+): { state: GameState; ok: boolean } => {
+  const s = normalizeForToday(prev);
+  if (!s.ownedPetScenes.includes(id) || s.equippedPetScene === id) {
+    return { state: s, ok: false };
+  }
+  return { state: { ...s, equippedPetScene: id }, ok: true };
+};
+
+export const setAppearanceMode = (
+  prev: GameState,
+  mode: AppearanceMode,
+): GameState => {
+  if (!isAppearanceMode(mode) || prev.appearanceMode === mode) return prev;
+  return { ...prev, appearanceMode: mode };
 };
 
 // Pets are earned, never bought — see unlockEarnedPets. Switching between

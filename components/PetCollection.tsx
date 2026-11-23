@@ -8,6 +8,8 @@ import {
   petProgress,
   petRemainingText,
   type MascotId,
+  type AccessoryId,
+  type PetSceneId,
   type PetStats,
 } from '../lib/gameState';
 
@@ -15,24 +17,26 @@ interface PetCollectionProps {
   stats: PetStats;
   ownedMascots: MascotId[];
   activeMascot: MascotId;
+  equippedAccessory: AccessoryId | null;
+  equippedPetScene: PetSceneId;
   onEquip: (id: MascotId) => void;
 }
 
-const PREVIEW_COUNT = 9; // 3x3 before "show all"
+const PREVIEW_COUNT = 3; // One compact row before the full collection.
 
 // Pets are earned by focusing. Earned pets can be chosen freely; locked ones
 // show as a soft silhouette with their goal and a progress bar.
-const PetCollection = ({ stats, ownedMascots, activeMascot, onEquip }: PetCollectionProps) => {
+const PetCollection = ({ stats, ownedMascots, activeMascot, equippedAccessory, equippedPetScene, onEquip }: PetCollectionProps) => {
   const [expanded, setExpanded] = useState(false);
   const owned = new Set(ownedMascots);
   const pets = expanded ? MASCOT_CATALOG : MASCOT_CATALOG.slice(0, PREVIEW_COUNT);
 
   return (
-    <section className="mt-3 w-full rounded-2xl border border-slate-200/70 bg-white p-4 text-left shadow-sm">
+    <section className="mt-3 w-full guide-panel rounded-2xl border border-slate-200/70 bg-white p-4 text-left shadow-sm">
       <header className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5 text-slate-500">
-          <Icon name="paw" size={16} plate />
-          <h2 className="text-[11px] font-black uppercase tracking-widest">
+          <Icon name="paw" size={18} className="text-brand-600" />
+          <h2 className="text-sm font-bold tracking-tight text-slate-800">
             Pet Collection
           </h2>
         </div>
@@ -40,10 +44,6 @@ const PetCollection = ({ stats, ownedMascots, activeMascot, onEquip }: PetCollec
           {owned.size}/{MASCOT_CATALOG.length} friends
         </span>
       </header>
-      <p className="mt-1 text-[10px] font-semibold text-slate-400">
-        Focus to meet new friends — every pet is earned, never bought.
-      </p>
-
       <ul className="mt-3 grid grid-cols-3 gap-2">
         {pets.map(pet => {
           const isOwned = owned.has(pet.id);
@@ -53,7 +53,7 @@ const PetCollection = ({ stats, ownedMascots, activeMascot, onEquip }: PetCollec
           return (
             <li
               key={pet.id}
-              className={`relative flex flex-col overflow-hidden rounded-xl border p-2 text-center transition-all duration-150 ${
+              className={`guide-pet-tile relative flex flex-col overflow-hidden rounded-xl border p-2 text-center transition-colors duration-150 ${
                 isActive
                   ? 'border-brand-300 bg-brand-50 shadow-sm'
                   : isOwned
@@ -72,6 +72,8 @@ const PetCollection = ({ stats, ownedMascots, activeMascot, onEquip }: PetCollec
                 <Mascot
                   mood="idle"
                   variant={pet.id}
+                  accessory={isActive ? equippedAccessory : null}
+                  scene={isActive ? equippedPetScene : 'classic'}
                   still
                   className={`mx-auto h-14 w-14 ${isActive ? 'stat-pop' : ''}`}
                 />
@@ -81,7 +83,7 @@ const PetCollection = ({ stats, ownedMascots, activeMascot, onEquip }: PetCollec
               </p>
 
               {isActive ? (
-                <span className="mt-1.5 flex items-center justify-center gap-1 rounded-lg bg-brand-600 py-1.5 text-[10px] font-black uppercase tracking-wide text-white">
+                <span className="mt-1.5 flex items-center justify-center gap-1 rounded-lg bg-brand-600 py-1.5 text-[10px] font-bold text-white">
                   <Icon name="check" size={10} />
                   With you
                 </span>
@@ -89,7 +91,7 @@ const PetCollection = ({ stats, ownedMascots, activeMascot, onEquip }: PetCollec
                 <button
                   onClick={() => onEquip(pet.id)}
                   aria-label={`Focus with ${pet.name}`}
-                  className="mt-1.5 min-h-11 w-full rounded-lg border border-brand-400 bg-white py-1 text-[10px] font-black uppercase tracking-wide text-brand-600 transition-transform active:scale-95"
+                  className="mt-1.5 min-h-11 w-full rounded-lg border border-brand-400 bg-white py-1 text-[10px] font-bold text-brand-600 transition-transform active:scale-95"
                 >
                   Choose
                 </button>
@@ -128,9 +130,9 @@ const PetCollection = ({ stats, ownedMascots, activeMascot, onEquip }: PetCollec
         <button
           onClick={() => setExpanded(e => !e)}
           aria-expanded={expanded}
-          className="mt-3 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white py-2 text-[10px] font-black uppercase tracking-wide text-slate-500 transition-transform active:scale-[0.99]"
+          className="mt-3 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white py-2 text-xs font-bold text-slate-600 transition-transform active:scale-[0.99]"
         >
-          <Icon name={expanded ? 'chevronDown' : 'chevronRight'} size={12} />
+          <Icon name={expanded ? 'chevronDown' : 'chevronRight'} size={13} />
           {expanded ? 'Show fewer' : `Show all ${MASCOT_CATALOG.length} pets`}
         </button>
       )}

@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from 'next';
-import { Roboto_Flex } from 'next/font/google';
 
 import 'tailwindcss/tailwind.css';
 /* Core CSS required for Ionic components to work properly */
@@ -24,6 +23,13 @@ import '../styles/variables.css';
 export const metadata: Metadata = {
   title: 'Focus Tracker',
   description: 'A friendly focus buddy: set the phone down and focus alongside your pet to grow streaks, coins, and a collection of friends.',
+  manifest: '/manifest.webmanifest',
+  icons: {
+    icon: [
+      { url: '/icons/cat-icon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', sizes: 'any' },
+    ],
+  },
 };
 
 export const viewport: Viewport = {
@@ -34,23 +40,13 @@ export const viewport: Viewport = {
   themeColor: '#0EA5E9',
 };
 
-// Self-hosted Roboto Flex — the variable app-standard typeface, tight at small
-// sizes. Variable weight covers every weight the UI uses (base + semibold +
-// bold + black) without faux-bold synthesis.
-const roboto = Roboto_Flex({
-  subsets: ['latin'],
-  weight: 'variable',
-  variable: '--font-roboto',
-  display: 'swap',
-});
-
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={roboto.variable}>
+    <html lang="en">
       {/* No remote scripts: the app runs fully offline and never executes
           third-party code (icons are emoji/inline SVG). */}
       <body>{children}</body>

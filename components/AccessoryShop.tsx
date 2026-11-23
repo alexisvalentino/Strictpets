@@ -33,30 +33,12 @@ const ART: Record<AccessoryId, JSX.Element> = {
       <circle cx="16" cy="14" r="2.1" fill="#FDE68A" />
     </>
   ),
-  bow: (
+  scarf: (
     <>
-      <path
-        d="M14.5 16 5.5 9.6a3.6 3.6 0 0 0-1.6 6.4 3.6 3.6 0 0 0 1.6 6.4L14.5 16Z"
-        fill="hsl(350 84% 52%)"
-      />
-      <path
-        d="M17.5 16l9-6.4a3.6 3.6 0 0 1 1.6 6.4 3.6 3.6 0 0 1-1.6 6.4L17.5 16Z"
-        fill="hsl(350 84% 52%)"
-      />
-      <path
-        d="M5.5 9.6a3.6 3.6 0 0 0 0 12.8"
-        stroke="#fff"
-        strokeWidth="1.2"
-        opacity="0.28"
-        fill="none"
-      />
-      <rect x="13.2" y="13.2" width="5.6" height="5.6" rx="2" fill="hsl(350 88% 40%)" />
-      <rect x="14.4" y="14.4" width="3.2" height="3.2" rx="1.3" fill="#fff" opacity="0.35" />
-      <path
-        d="M14 20.4 12.4 27l3.6-2.2L19 27l-1.6-6.6"
-        fill="hsl(350 84% 52%)"
-        opacity="0.85"
-      />
+      <path d="M5 9 Q16 15 27 9 L24 17 Q16 21 8 17 Z" fill="#38BDF8" stroke="#0284C7" strokeWidth="1.4" strokeLinejoin="round" />
+      <path d="M9 12 Q16 16 23 12" fill="none" stroke="#E0F2FE" strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M11 17 L16 29 L21 17 Z" fill="#0EA5E9" stroke="#0284C7" strokeWidth="1.2" strokeLinejoin="round" />
+      <path d="M15 20 L16 25 L17 20" fill="none" stroke="#BAE6FD" strokeWidth="1.2" strokeLinecap="round" />
     </>
   ),
   'party-hat': (
@@ -74,28 +56,13 @@ const ART: Record<AccessoryId, JSX.Element> = {
       <circle cx="15.2" cy="3.9" r="1" fill="#FEF3C7" />
     </>
   ),
-  cap: (
+  halo: (
     <>
-      <path
-        d="M4.5 18.5a11.5 11.5 0 0 1 23 0v1.4H4.5v-1.4Z"
-        fill="hsl(199 89% 48%)"
-      />
-      <path
-        d="M4.5 18.5a11.5 11.5 0 0 1 7-10.6"
-        stroke="#fff"
-        strokeWidth="1.4"
-        opacity="0.25"
-        fill="none"
-      />
-      <path
-        d="M27.5 19.9h1.6a1.9 1.9 0 0 1 0 3.8h-12"
-        stroke="hsl(199 95% 38%)"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        fill="none"
-      />
-      <circle cx="16" cy="10" r="1.5" fill="#fff" opacity="0.5" />
-      <path d="M4.5 22.2h23" stroke="#fff" strokeWidth="1" opacity="0.15" />
+      <ellipse cx="16" cy="17" rx="10" ry="4" fill="none" stroke="#7DD3FC" strokeWidth="4" opacity="0.35" />
+      <ellipse cx="16" cy="17" rx="10" ry="4" fill="none" stroke="#38BDF8" strokeWidth="2" />
+      <path d="M8.5 15.2 Q16 12.6 23.5 15.2" fill="none" stroke="#E0F2FE" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M4.5 8.5 6 5.5 7.5 8.5 10.5 10 7.5 11.5 6 14.5 4.5 11.5 1.5 10 Z" fill="#FBBF24" />
+      <path d="M25.5 7 26.7 4.6 27.9 7 30.3 8.2 27.9 9.4 26.7 11.8 25.5 9.4 23.1 8.2 Z" fill="#FBBF24" />
     </>
   ),
   sunglasses: (
@@ -150,24 +117,18 @@ const AccessoryShop = ({
   onBuy,
   onEquip,
 }: AccessoryShopProps) => (
-  <section className="mt-3 w-full rounded-2xl border border-slate-200/70 bg-white p-4 text-left shadow-sm">
+  <section className="mt-3 w-full guide-panel rounded-2xl border border-slate-200/70 bg-white p-4 text-left shadow-sm">
     <header className="flex items-center justify-between gap-2">
       <div className="flex items-center gap-2.5 text-slate-500">
-        <Icon name="ribbon" size={16} plate />
-        <h2 className="text-[11px] font-black uppercase tracking-widest">
+        <Icon name="ribbon" size={18} className="text-brand-600" />
+        <h2 className="text-sm font-bold tracking-tight text-slate-800">
           Accessories
         </h2>
       </div>
-      <span className="flex items-center gap-1 whitespace-nowrap rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-black tabular-nums text-brand-600">
-        <Icon name="coin" size={11} />
-        {coins}
-      </span>
     </header>
 
-    {/* Three columns only where a cell can hold a 44px-wide button; on the
-        narrowest phone-landscape viewports two columns keep the price legible
-        instead of clipping it. */}
-    <ul className="mt-3 grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
+    {/* Three columns shorten the shop while keeping each action thumb-sized. */}
+    <ul className="mt-3 grid grid-cols-3 gap-2">
       {ACCESSORY_CATALOG.map(item => {
         const owned = ownedAccessories.includes(item.id);
         const active = equippedAccessory === item.id;
@@ -175,7 +136,7 @@ const AccessoryShop = ({
         return (
           <li
             key={item.id}
-            className={`relative flex flex-col rounded-xl border p-2 text-center transition-all duration-150 ${
+            className={`guide-shop-tile relative flex flex-col rounded-xl border p-2 text-center transition-colors duration-150 ${
               active
                 ? 'border-brand-300 bg-brand-50 shadow-sm'
                 : 'border-slate-200 bg-white'
@@ -192,14 +153,14 @@ const AccessoryShop = ({
               {item.price}
             </p>
             {active ? (
-              <span className="mt-1.5 flex items-center justify-center gap-1 rounded-lg bg-brand-600 py-1.5 text-[10px] font-black uppercase tracking-wide text-white">
+                <span className="mt-1.5 flex items-center justify-center gap-1 rounded-lg bg-brand-600 py-1.5 text-[10px] font-bold text-white">
                 <Icon name="check" size={11} />
                 Worn
               </span>
             ) : owned ? (
               <button
                 onClick={() => onEquip(item.id)}
-                className="mt-1.5 min-h-11 w-full rounded-lg border border-brand-400 bg-white py-1 text-[10px] font-black uppercase tracking-wide text-brand-600 transition-transform active:scale-95"
+                className="mt-1.5 min-h-11 w-full rounded-lg border border-brand-400 bg-white py-1 text-[10px] font-bold text-brand-600 transition-transform active:scale-95"
               >
                 Wear
               </button>
@@ -207,13 +168,13 @@ const AccessoryShop = ({
               <button
                 onClick={() => onBuy(item.id)}
                 disabled={!affordable}
-                className={`mt-1.5 min-h-11 w-full rounded-lg py-1 text-[10px] font-black uppercase tracking-wide transition-transform active:scale-95 ${
+                className={`mt-1.5 min-h-11 w-full rounded-lg py-1 text-[10px] font-bold transition-transform active:scale-95 ${
                   affordable
-                    ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-white shadow-sm shadow-amber-500/30'
+                    ? 'bg-gradient-to-r from-amber-800 to-amber-700 text-white shadow-sm shadow-amber-700/30'
                     : 'cursor-not-allowed bg-slate-100 text-slate-400'
                 }`}
               >
-                Buy {item.price}
+                Unlock
               </button>
             )}
           </li>
@@ -223,10 +184,12 @@ const AccessoryShop = ({
 
     {equippedAccessory && (
       <button
+        type="button"
         onClick={() => onEquip(null)}
-        className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white py-1.5 text-[10px] font-black uppercase tracking-wide text-slate-500 transition-transform active:scale-95"
+        aria-label="Remove equipped accessory"
+        className="accessory-remove-button mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold transition-[background-color,border-color,box-shadow,transform] duration-200 active:scale-[0.98]"
       >
-        <Icon name="close" size={11} />
+        <Icon name="close" size={14} className="text-slate-500" />
         Remove accessory
       </button>
     )}

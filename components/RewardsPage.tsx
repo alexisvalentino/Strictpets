@@ -1,20 +1,25 @@
 'use client';
 import { useState } from 'react';
 import Icon from './Icon';
+import Mascot from './Mascot';
 import {
   DAILY_GOAL,
   DAILY_GOAL_REWARD,
   DAY_REWARDS,
   checkinMultiplier,
   checkinReward,
+  type AppearanceMode,
   type AccessoryId,
   type MascotId,
+  type PetSceneId,
   type ThemeId,
 } from '../lib/gameState';
 import PetCollection from './PetCollection';
 import AccessoryShop from './AccessoryShop';
 import ThemeShop from './ThemeShop';
+import PetSceneShop from './PetSceneShop';
 import AchievementsCard from './AchievementsCard';
+import { nativeSelectionHaptic } from '../lib/native';
 
 interface RewardsPageProps {
   coins: number;
@@ -28,6 +33,9 @@ interface RewardsPageProps {
   equippedAccessory: AccessoryId | null;
   ownedThemes: ThemeId[];
   activeTheme: ThemeId;
+  ownedPetScenes: PetSceneId[];
+  equippedPetScene: PetSceneId;
+  appearanceMode: AppearanceMode;
   longestSession: number;
   bestStreak: number;
   jackpots: number;
@@ -46,6 +54,9 @@ interface RewardsPageProps {
   onEquipAccessory: (id: AccessoryId | null) => void;
   onBuyTheme: (id: ThemeId) => void;
   onEquipTheme: (id: ThemeId) => void;
+  onBuyPetScene: (id: PetSceneId) => void;
+  onEquipPetScene: (id: PetSceneId) => void;
+  onSetAppearanceMode: (mode: AppearanceMode) => void;
 }
 
 // Render the check-in multiplier without trailing zeros (x1, x1.5, x2.5...).
@@ -75,6 +86,9 @@ const RewardsPage = ({
   equippedAccessory,
   ownedThemes,
   activeTheme,
+  ownedPetScenes,
+  equippedPetScene,
+  appearanceMode,
   longestSession,
   bestStreak,
   jackpots,
@@ -93,22 +107,32 @@ const RewardsPage = ({
   onEquipAccessory,
   onBuyTheme,
   onEquipTheme,
+  onBuyPetScene,
+  onEquipPetScene,
+  onSetAppearanceMode,
 }: RewardsPageProps) => {
   const [tab, setTab] = useState<RewardsTab>('claim');
+  const [checkinExpanded, setCheckinExpanded] = useState(claimableDay !== null);
 
   const goalPct = Math.min(100, (minutesToday / DAILY_GOAL) * 100);
   const completedCycleToday = checkedInToday && checkinProgress === DAY_REWARDS.length;
+  const checkinDetailsOpen = checkinExpanded || claimableDay !== null;
   const displayJackpots = completedCycleToday ? Math.max(0, jackpots - 1) : jackpots;
   const mult = checkinMultiplier(displayJackpots);
   const checkinStatus = completedCycleToday
-    ? 'Seven-day cycle complete. Your next cycle opens tomorrow.'
+    ? 'Next cycle tomorrow.'
     : checkedInToday
-      ? 'Checked in today. Your next streak reward is available tomorrow.'
+      ? 'Next reward tomorrow.'
       : claimableDay !== null
-        ? `Day ${claimableDay} is ready. Claim once each day to advance.`
+        ? `Claim day ${claimableDay}.`
         : currentStreak === 0
-          ? 'Complete a focus session today to unlock your first check-in.'
-          : 'Focus today to unlock your next streak reward.';
+          ? 'Focus today to begin.'
+          : 'Focus today to advance.';
+  const checkinSummary = claimableDay !== null
+    ? `Day ${claimableDay} ready`
+    : completedCycleToday
+      ? 'Complete'
+      : `${checkinProgress}/7`;
 
   return (
     <div className="flex h-full w-full shrink-0 snap-start flex-col overflow-y-auto">
@@ -123,7 +147,7 @@ const RewardsPage = ({
 
       <div className="my-auto mx-auto w-full max-w-md px-4 py-6 pl-[max(1rem,var(--safe-area-left))] pr-[max(1rem,var(--safe-area-right))] sm:px-6 md:max-w-3xl lg:max-w-4xl">
         <div className="flex items-center justify-between gap-2">
-          <h1 className="text-sm font-black uppercase tracking-[0.35em] text-brand-600">
+          <h1 className="text-2xl font-black tracking-tight text-slate-900">
             Rewards
           </h1>
           <span className="flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-black tabular-nums text-slate-700 shadow-sm ring-1 ring-slate-200/70">
@@ -132,11 +156,11 @@ const RewardsPage = ({
           </span>
         </div>
 
-        {/* two tabs keep the page's two jobs apart */}
+        {/* Two fixed destinations; this is a tab strip, not a long content list. */}
         <div
           role="tablist"
           aria-label="Rewards sections"
-          className="mt-3 flex gap-1 rounded-xl bg-white p-1 shadow-sm ring-1 ring-slate-200/70"
+          className="guide-segmented mt-3 flex gap-1 rounded-xl bg-white p-1 shadow-sm ring-1 ring-slate-200/70"
         >
           {TABS.map(t => {
             const isActive = tab === t.key;
@@ -145,8 +169,11 @@ const RewardsPage = ({
                 key={t.key}
                 role="tab"
                 aria-selected={isActive}
-                onClick={() => setTab(t.key)}
-                className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg text-[11px] font-black uppercase tracking-wide transition-colors ${
+                onClick={() => {
+                  if (tab !== t.key) nativeSelectionHaptic();
+                  setTab(t.key);
+                }}
+                className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg text-sm font-semibold tracking-tight transition-colors active:scale-[0.99] ${
                   isActive
                     ? 'bg-brand-600 text-white shadow-sm'
                     : 'text-slate-500'
@@ -166,26 +193,35 @@ const RewardsPage = ({
 
         {tab === 'claim' && (
           <>
-            <section className="mt-3 rounded-2xl border border-slate-200/70 bg-white p-4 text-left shadow-sm">
-              <header className="flex items-center gap-2.5 text-slate-500">
-                <Icon name="target" size={16} plate />
-                <h2 className="text-[11px] font-black uppercase tracking-widest">
-                  Focus goal
-                </h2>
+            <section className="mt-4 guide-panel rounded-[24px] border border-sky-100 bg-white p-3 text-left shadow-sm sm:p-4">
+              <header className="flex items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <h2 className="text-base font-black tracking-tight text-slate-900">Focus goal</h2>
+                    <p className="shrink-0 text-xs font-bold tabular-nums text-slate-500">
+                      {Math.min(minutesToday, DAILY_GOAL)}/{DAILY_GOAL} min
+                    </p>
+                  </div>
+                </div>
+                <Mascot
+                  mood="idle"
+                  variant={activeMascot}
+                  accessory={equippedAccessory}
+                  scene={equippedPetScene}
+                  still
+                  className="h-14 w-14 shrink-0"
+                />
               </header>
-              <div className="mt-3 flex items-baseline justify-between">
-                <p className="text-xs font-black text-slate-700">Today&apos;s progress</p>
-                <p className="text-[11px] font-bold tabular-nums text-slate-500">
-                  {Math.min(minutesToday, DAILY_GOAL)}/{DAILY_GOAL} min
-                </p>
-              </div>
-              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-sky-100">
+              <div
+                role="progressbar"
+                aria-label="Today&apos;s focus progress"
+                aria-valuemin={0}
+                aria-valuemax={DAILY_GOAL}
+                aria-valuenow={Math.min(minutesToday, DAILY_GOAL)}
+                className="mt-1 h-2 w-full overflow-hidden rounded-full bg-sky-100"
+              >
                 <div
-                  className={`relative h-full overflow-hidden rounded-full bg-gradient-to-r transition-all duration-500 ${
-                    dailyGoalReached || dailyGoalClaimed
-                      ? 'from-emerald-400 to-emerald-600'
-                      : 'from-sky-400 to-brand-600'
-                  }`}
+                  className="relative h-full overflow-hidden rounded-full bg-gradient-to-r from-sky-400 to-brand-600 transition-[width] duration-500 ease-out"
                   style={{ width: `${goalPct}%` }}
                 >
                   <div className="absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-white/40 to-transparent bg-[length:200%_100%]" />
@@ -193,7 +229,7 @@ const RewardsPage = ({
               </div>
 
               {dailyGoalClaimed ? (
-                <p className="mt-2 flex items-center justify-center gap-1 text-[11px] font-black text-emerald-600">
+                <p className="mt-2 flex items-center justify-center gap-1 text-[11px] font-black text-brand-700">
                   <span className="rw-pop inline-block">
                     <Icon name="check" size={12} />
                   </span>
@@ -202,35 +238,54 @@ const RewardsPage = ({
               ) : dailyGoalReached ? (
                 <button
                   onClick={onClaimGoal}
-                  className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 py-2.5 text-xs font-black uppercase tracking-wide text-white shadow-md shadow-emerald-500/30 transition-transform active:scale-95"
+                  className="guide-success-cta mt-2 flex min-h-12 w-full items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r from-brand-700 to-sky-700 py-2.5 text-sm font-bold text-white shadow-md shadow-brand-700/20 transition-transform active:scale-[0.98]"
                 >
                   Claim +{DAILY_GOAL_REWARD}
                   <Icon name="coin" size={13} tone="inherit" />
                 </button>
               ) : (
-                <p className="mt-2 text-[11px] font-semibold text-slate-500">
-                  {DAILY_GOAL - Math.min(minutesToday, DAILY_GOAL)} more focused
-                  minutes to earn {DAILY_GOAL_REWARD} coins
+                <p className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-slate-500">
+                  {DAILY_GOAL - Math.min(minutesToday, DAILY_GOAL)} min to go · +{DAILY_GOAL_REWARD}
+                  <Icon name="coin" size={11} />
                 </p>
               )}
             </section>
 
-            <section className="mt-3 rounded-2xl border border-slate-200/70 bg-white p-4 text-left shadow-sm">
-              <header className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2.5 text-slate-500">
-                  <Icon name="calendar" size={16} plate />
-                  <h2 className="text-[11px] font-black uppercase tracking-widest">
-                    Streak check-in
-                  </h2>
-                </div>
-                <span className="whitespace-nowrap rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-black tabular-nums tracking-wider text-brand-600">
-                  Cycle {displayJackpots + 1} · ×{formatMult(mult)}
-                </span>
-              </header>
-              <p className="mt-2 flex items-center gap-1 text-[11px] font-bold text-amber-600">
-                <Icon name="flame" size={12} />
-                {currentStreak} day{currentStreak === 1 ? '' : 's'} in your streak
-              </p>
+            <section className="mt-3 guide-panel rounded-2xl border border-slate-200/70 bg-white p-3 text-left shadow-sm">
+              <h2>
+                <button
+                  type="button"
+                  disabled={claimableDay !== null}
+                  onClick={() => setCheckinExpanded(value => !value)}
+                  aria-expanded={checkinDetailsOpen}
+                  aria-controls="streak-checkin-details"
+                  className="flex min-h-11 w-full items-center gap-2.5 text-left"
+                >
+                  <Icon name="calendar" size={18} className="shrink-0 text-brand-600" />
+                  <span className="min-w-0 flex-1 text-sm font-bold tracking-tight text-slate-800">7-day rewards</span>
+                  <span
+                    aria-label={
+                      claimableDay !== null
+                        ? `Day ${claimableDay} reward ready`
+                        : completedCycleToday
+                          ? 'Reward cycle complete'
+                          : `Cycle ${displayJackpots + 1}, ${checkinProgress} of 7 rewards claimed`
+                    }
+                    className="shrink-0 rounded-full bg-sky-50 px-2.5 py-1 text-[10px] font-black tabular-nums text-brand-700"
+                  >
+                    {checkinSummary}
+                  </span>
+                  {claimableDay === null && <Icon name={checkinDetailsOpen ? 'chevronDown' : 'chevronRight'} size={15} className="text-slate-400" />}
+                </button>
+              </h2>
+              <div id="streak-checkin-details" className="disclosure-reveal" hidden={!checkinDetailsOpen}>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <p className="flex items-center gap-1 text-[11px] font-bold text-brand-700">
+                  <Icon name="flame" size={12} />
+                  {currentStreak} day{currentStreak === 1 ? '' : 's'} in your streak
+                </p>
+                <span className="text-[10px] font-bold text-slate-400">Cycle {displayJackpots + 1} · ×{formatMult(mult)}</span>
+              </div>
               {/* Seven cells need 332px of content width to clear 44px
                   each (7*44 + 6*4 gap), which is a 400px viewport once the
                   page and card padding are added. Below that the strip
@@ -254,20 +309,20 @@ const RewardsPage = ({
                             ? `Claim day ${day} reward, ${escalated} coins`
                             : `Day ${day} locked, ${escalated} coins`
                       }
-                      className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg border px-1 py-1.5 transition-all duration-200 active:scale-90 ${
+                      className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg border px-1 py-1.5 transition-colors duration-200 active:scale-90 ${
                         claimed
-                          ? 'border-emerald-300 bg-emerald-50'
+                          ? 'border-sky-200 bg-sky-50'
                           : claimable
-                            ? 'animate-pulse border-amber-300 bg-gradient-to-b from-amber-100 to-amber-50 shadow-md shadow-amber-500/20'
+                            ? 'border-brand-300 bg-sky-50 shadow-sm shadow-sky-500/10'
                             : 'border-slate-200 bg-slate-50 opacity-70'
                       }`}
                     >
                       <span
                         className={`text-[10px] font-bold ${
                           claimed
-                            ? 'text-emerald-600'
+                            ? 'text-brand-700'
                             : claimable
-                              ? 'text-amber-600'
+                              ? 'text-brand-700'
                               : 'text-slate-500'
                         }`}
                       >
@@ -284,9 +339,9 @@ const RewardsPage = ({
                       <span
                         className={`text-[10px] font-black ${
                           claimed
-                            ? 'text-emerald-600'
+                            ? 'text-brand-700'
                             : claimable
-                              ? 'text-amber-600'
+                              ? 'text-brand-700'
                               : 'text-slate-400'
                         }`}
                       >
@@ -305,30 +360,26 @@ const RewardsPage = ({
               <p className="mt-2 text-[10px] font-semibold leading-relaxed text-slate-500">
                 {checkinStatus}
               </p>
+              </div>
             </section>
 
-            <section className="mt-3 flex items-center gap-3 rounded-2xl border border-slate-200/70 bg-white p-4 text-left shadow-sm">
-              <Icon name="gift" size={18} plate />
+            <section className="mt-3 flex items-center gap-3 guide-panel rounded-2xl border border-slate-200/70 bg-white px-4 py-3 text-left shadow-sm">
+              <Icon name="gift" size={19} className="text-brand-600" />
               <div className="min-w-0 flex-1">
-                <h2 className="text-[11px] font-black uppercase tracking-widest text-slate-700">
+                <h2 className="text-sm font-bold tracking-tight text-slate-800">
                   Daily gift
                 </h2>
-                <p className="mt-1 text-[11px] font-semibold leading-relaxed text-slate-500">
-                  {bonusAvailable
-                    ? 'Free coins once each day. No focus session needed.'
-                    : 'Collected today. A new gift is available tomorrow.'}
-                </p>
               </div>
               {bonusAvailable ? (
                 <button
                   onClick={onCollectBonus}
-                  className="flex min-h-11 shrink-0 items-center gap-1 rounded-xl bg-amber-500 px-3 py-2 text-xs font-black uppercase tracking-wide text-white shadow-sm shadow-amber-500/30 transition-transform active:scale-95"
+                  className="flex min-h-11 shrink-0 items-center gap-1 rounded-xl bg-brand-600 px-3 py-2 text-xs font-bold text-white shadow-sm shadow-brand-600/20 transition-transform active:scale-[0.98]"
                 >
                   Collect +{bonusValue}
                   <Icon name="coin" size={12} tone="inherit" />
                 </button>
               ) : (
-                <span className="flex min-h-11 shrink-0 items-center gap-1 rounded-xl bg-emerald-50 px-2.5 text-[10px] font-black uppercase tracking-wide text-emerald-700">
+                <span className="flex min-h-11 shrink-0 items-center gap-1 rounded-xl bg-emerald-50 px-2.5 text-[10px] font-bold text-emerald-700">
                   <Icon name="check" size={11} tone="emerald" />
                   Collected
                 </span>
@@ -352,6 +403,8 @@ const RewardsPage = ({
                   stats={{ focusSeconds, totalSessions, bestStreak }}
                   ownedMascots={ownedMascots}
                   activeMascot={activeMascot}
+                  equippedAccessory={equippedAccessory}
+                  equippedPetScene={equippedPetScene}
                   onEquip={onEquipMascot}
                 />
               </div>
@@ -360,24 +413,37 @@ const RewardsPage = ({
         )}
 
         {tab === 'collect' && (
-          <div className="md:grid md:grid-cols-2 md:items-start md:gap-x-6">
-            <div>
-              <AccessoryShop
-                coins={coins}
-                ownedAccessories={ownedAccessories}
-                equippedAccessory={equippedAccessory}
-                onBuy={onBuyAccessory}
-                onEquip={onEquipAccessory}
-              />
-            </div>
-            <div>
-              <ThemeShop
-                coins={coins}
-                ownedThemes={ownedThemes}
-                activeTheme={activeTheme}
-                onBuy={onBuyTheme}
-                onEquip={onEquipTheme}
-              />
+          <div>
+            <PetSceneShop
+              coins={coins}
+              activeMascot={activeMascot}
+              equippedAccessory={equippedAccessory}
+              ownedPetScenes={ownedPetScenes}
+              equippedPetScene={equippedPetScene}
+              onBuy={onBuyPetScene}
+              onEquip={onEquipPetScene}
+            />
+            <div className="md:grid md:grid-cols-2 md:items-start md:gap-x-6">
+              <div>
+                <AccessoryShop
+                  coins={coins}
+                  ownedAccessories={ownedAccessories}
+                  equippedAccessory={equippedAccessory}
+                  onBuy={onBuyAccessory}
+                  onEquip={onEquipAccessory}
+                />
+              </div>
+              <div>
+                <ThemeShop
+                  coins={coins}
+                  ownedThemes={ownedThemes}
+                  activeTheme={activeTheme}
+                  appearanceMode={appearanceMode}
+                  onBuy={onBuyTheme}
+                  onEquip={onEquipTheme}
+                  onSetAppearanceMode={onSetAppearanceMode}
+                />
+              </div>
             </div>
           </div>
         )}

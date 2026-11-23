@@ -45,7 +45,7 @@ const DevTip = ({ enabled = true }: { enabled?: boolean }) => {
         <button
           onClick={dismiss}
           aria-label="Dismiss"
-          className="absolute right-1 top-1 flex h-10 w-10 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+          className="absolute right-1 top-1 flex h-10 w-10 items-center justify-center rounded-full text-slate-400 transition-colors active:bg-slate-100 active:text-slate-600"
         >
           <Icon name="close" size={14} />
         </button>

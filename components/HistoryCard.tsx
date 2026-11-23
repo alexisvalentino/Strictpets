@@ -1,14 +1,9 @@
 'use client';
+import { useState } from 'react';
 import Icon from './Icon';
-import type { FocusLogEntry } from '../lib/gameState';
+import { DAILY_GOAL, type FocusLogEntry } from '../lib/gameState';
 
-const WEEKDAY = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-
-// Parse a YYYY-MM-DD key as a local calendar date (not UTC midnight).
-const weekdayOf = (key: string): number => {
-  const [y, m, d] = key.split('-').map(Number);
-  return new Date(y, m - 1, d).getDay();
-};
+const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const formatMinutes = (seconds: number): string => {
   const min = Math.round(seconds / 60);
@@ -18,74 +13,122 @@ const formatMinutes = (seconds: number): string => {
   return m ? `${h} h ${m} min` : `${h} h`;
 };
 
-// Seven-day focus history: one bar per day, oldest on the left, today last.
 const HistoryCard = ({ days }: { days: FocusLogEntry[] }) => {
-  const maxSeconds = Math.max(1, ...days.map(d => d.seconds));
+  const [chartExpanded, setChartExpanded] = useState(false);
+  const goalSeconds = DAILY_GOAL * 60;
+  const maxSeconds = Math.max(goalSeconds, ...days.map(d => d.seconds));
   const totalSeconds = days.reduce((sum, d) => sum + d.seconds, 0);
   const totalSessions = days.reduce((sum, d) => sum + d.sessions, 0);
   const activeDays = days.filter(d => d.sessions > 0).length;
+  const goalDays = days.filter(d => d.seconds >= goalSeconds).length;
+  const goalHeight = (goalSeconds / maxSeconds) * 100;
 
   return (
-    <section className="mt-3 w-full rounded-2xl border border-slate-200/70 bg-white p-4 text-left shadow-sm">
-      <header className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2.5 text-slate-500">
-          <Icon name="chart" size={16} plate />
-          <h2 className="text-[11px] font-black uppercase tracking-widest">
-            This Week
+    <section className="guide-panel w-full rounded-[24px] bg-white p-4 text-left shadow-sm ring-1 ring-sky-100/80 md:p-5">
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-black tracking-tight text-slate-900">
+            Focused time
           </h2>
+          {totalSessions > 0 && (
+            <p className="mt-1 text-xs font-medium text-slate-500">
+              {totalSessions} session{totalSessions === 1 ? '' : 's'} · {activeDays} active day{activeDays === 1 ? '' : 's'}
+            </p>
+          )}
         </div>
-        <span className="whitespace-nowrap rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-black tabular-nums text-brand-600">
-          {activeDays}/7 days
+        <span className="shrink-0 rounded-full bg-sky-50 px-2.5 py-1 text-[10px] font-black tabular-nums text-brand-700">
+          {goalDays}/7 goal days
         </span>
       </header>
 
-      <div
-        role="img"
-        aria-label={`Focus over the last 7 days: ${days
-          .map(d => `${formatMinutes(d.seconds)}`)
-          .join(', ')}`}
-        className="mt-3 flex h-20 items-end gap-1.5"
+      <div className="mt-3 flex items-end justify-between gap-3">
+        <div>
+          <p className="text-3xl font-black leading-none tracking-tight tabular-nums text-slate-900">
+            {formatMinutes(totalSeconds)}
+          </p>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        aria-expanded={chartExpanded}
+        aria-controls="weekly-focus-chart"
+        onClick={() => setChartExpanded(expanded => !expanded)}
+        className="mt-3 flex min-h-11 w-full items-center justify-between border-t border-sky-100 pt-2 text-left text-xs font-bold text-brand-700"
       >
-        {days.map((d, i) => {
-          const isToday = i === days.length - 1;
-          const pct = d.seconds > 0 ? Math.max(8, (d.seconds / maxSeconds) * 100) : 0;
-          return (
-            <div key={d.date} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
-              <div className="flex w-full flex-1 items-end">
-                <div
-                  className={`w-full rounded-md transition-all duration-500 ${
-                    d.seconds > 0
-                      ? isToday
-                        ? 'bg-gradient-to-t from-brand-600 to-sky-400'
-                        : 'bg-sky-300'
-                      : 'bg-slate-100'
-                  }`}
-                  style={{ height: d.seconds > 0 ? `${pct}%` : '4px' }}
-                />
-              </div>
+        <span>{chartExpanded ? 'Hide week chart' : 'View week chart'}</span>
+        <Icon name={chartExpanded ? 'chevronDown' : 'chevronRight'} size={15} />
+      </button>
+
+      <div id="weekly-focus-chart" className="disclosure-reveal" hidden={!chartExpanded}>
+        <div className="mt-3 flex items-end justify-between gap-3">
+          <span className="text-xs font-semibold text-slate-500">
+            Daily goal <span className="font-black text-brand-700">{DAILY_GOAL} min</span>
+          </span>
+        </div>
+        <div
+          role="img"
+          aria-label={`Focus over the last seven days: ${days
+            .map(d => `${formatMinutes(d.seconds)} on ${WEEKDAY[weekdayOf(d.date)]}`)
+            .join(', ')}. Dashed line marks the ${DAILY_GOAL}-minute daily goal.`}
+          className="mt-3"
+        >
+          <div className="relative h-28">
+            <div
+              aria-hidden="true"
+              className="absolute inset-x-0 z-10 border-t border-dashed border-sky-300"
+              style={{ bottom: `${goalHeight}%` }}
+            />
+            <div className="flex h-full items-end gap-2">
+              {days.map((d, i) => {
+                const isToday = i === days.length - 1;
+                const pct = d.seconds > 0 ? Math.max(6, (d.seconds / maxSeconds) * 100) : 0;
+                const reachesGoal = d.seconds >= goalSeconds;
+                return (
+                  <div key={d.date} className="flex h-full min-w-0 flex-1 items-end">
+                    <div
+                      aria-hidden="true"
+                      title={`${WEEKDAY[weekdayOf(d.date)]}: ${formatMinutes(d.seconds)}`}
+                      className={`history-bar-enter w-full rounded-t-[7px] ${
+                        d.seconds === 0
+                          ? 'h-1 bg-sky-100'
+                          : isToday
+                            ? 'bg-brand-600'
+                            : reachesGoal
+                              ? 'bg-sky-500'
+                              : 'bg-sky-300'
+                      }`}
+                      style={{
+                        height: d.seconds > 0 ? `${pct}%` : undefined,
+                        animationDelay: `${i * 45}ms`,
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div className="mt-2 flex gap-2">
+            {days.map((d, i) => (
               <span
-                className={`text-[10px] font-black ${isToday ? 'text-brand-600' : 'text-slate-400'}`}
+                key={d.date}
+                className={`min-w-0 flex-1 text-center text-[10px] font-bold ${
+                  i === days.length - 1 ? 'text-brand-700' : 'text-slate-500'
+                }`}
               >
                 {WEEKDAY[weekdayOf(d.date)]}
               </span>
-            </div>
-          );
-        })}
+            ))}
+          </div>
+        </div>
       </div>
-
-      <p className="mt-2 flex items-center justify-center gap-1 text-center text-[10px] font-semibold text-slate-500">
-        {totalSessions > 0 ? (
-          <>
-            {formatMinutes(totalSeconds)} focused · {totalSessions} session
-            {totalSessions === 1 ? '' : 's'} this week
-          </>
-        ) : (
-          'Your week starts with one session'
-        )}
-        <Icon name="paw" size={11} className="text-slate-300" />
-      </p>
     </section>
   );
+};
+
+const weekdayOf = (key: string): number => {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d).getDay();
 };
 
 export default HistoryCard;

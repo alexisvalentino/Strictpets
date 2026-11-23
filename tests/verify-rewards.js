@@ -2,6 +2,8 @@
 // logic layer behind the UI). Run with `npm test` (compiles lib/gameState.ts
 // into the git-ignored .tmp-gs/ first). Exit code 0 = every flow verified.
 const gs = require('../.tmp-gs/gameState');
+const fs = require('node:fs');
+const path = require('node:path');
 
 let pass = 0;
 let fail = 0;
@@ -138,6 +140,35 @@ console.log('== 4. Check-in strip D1-D7 + jackpot + escalation ==');
   const newCycleD1 = gs.claimDayReward(nextDay, 1);
   ok(newCycleD1.reward > 0, 'D1 claimable next day after D7 (new cycle)');
   ok(newCycleD1.state.jackpots === 1, 'jackpot count still 1 after D1 of cycle 2');
+
+  // Walk real focus transitions across the cycle boundary. The check-in
+  // reward strip loops to Day 1, but the consecutive focus streak must not.
+  let continuous = base();
+  for (let day = 1; day <= 7; day++) {
+    const date = D7(day);
+    continuous = gs.recordSession(continuous, 60, date).state;
+    ok(continuous.currentStreak === day, `focus streak reaches ${day} on cycle day ${day}`);
+    const claimDay = gs.claimableCheckinDay(continuous, date);
+    ok(claimDay === day, `cycle day ${day} reward becomes claimable`);
+    continuous = gs.claimDayReward(continuous, claimDay, date).state;
+  }
+  const eighthDay = D7(8);
+  continuous = gs.recordSession(continuous, 60, eighthDay).state;
+  ok(continuous.currentStreak === 8 && continuous.bestStreak === 8, 'focus streak and best streak continue to day 8');
+  ok(gs.checkinProgress(continuous, eighthDay) === 0, 'new reward cycle starts at 0/7 without resetting the focus streak');
+  ok(gs.claimableCheckinDay(continuous, eighthDay) === 1, 'day 8 focus can claim cycle 2, day 1');
+  continuous = gs.claimDayReward(continuous, 1, eighthDay).state;
+  for (let day = 9; day <= 30; day++) {
+    const date = D7(day);
+    continuous = gs.recordSession(continuous, 60, date).state;
+    ok(continuous.currentStreak === day, `focus streak keeps counting through day ${day}`);
+    const cycleDay = ((day - 1) % gs.DAY_REWARDS.length) + 1;
+    const claimDay = gs.claimableCheckinDay(continuous, date);
+    ok(claimDay === cycleDay, `day ${day} continues on reward cycle day ${cycleDay}`);
+    continuous = gs.claimDayReward(continuous, claimDay, date).state;
+  }
+  ok(continuous.currentStreak === 30 && continuous.bestStreak === 30, 'streak and personal best reach day 30');
+  ok(continuous.jackpots === 4, 'four weekly reward cycles complete without resetting the streak');
 
   // === Edge case: catch-up within cycle limited to one per day ===
   let catchup = base();
@@ -332,18 +363,36 @@ console.log('== 10. Mascot / accessory / theme shops ==');
   // Accessory: buy auto-equips, re-buy fails, equip/remove works
   let s = base();
   s.coins = 400;
-  const ab = gs.buyAccessory(s, 'bow');
-  ok(ab.ok && ab.cost === 150 && ab.state.coins === 250, 'bow bought for 150');
-  ok(ab.state.ownedAccessories.includes('bow') && ab.state.equippedAccessory === 'bow', 'auto-equipped');
-  ok(!gs.buyAccessory(ab.state, 'bow').ok, 'cannot re-buy');
+  const ab = gs.buyAccessory(s, 'scarf');
+  ok(ab.ok && ab.cost === 150 && ab.state.coins === 250, 'scarf bought for 150');
+  ok(ab.state.ownedAccessories.includes('scarf') && ab.state.equippedAccessory === 'scarf', 'auto-equipped');
+  ok(!gs.buyAccessory(ab.state, 'scarf').ok, 'cannot re-buy');
   const f = gs.buyAccessory(ab.state, 'flower');
   ok(f.ok && f.state.equippedAccessory === 'flower', 'flower bought + equipped');
-  const eq = gs.equipAccessory(f.state, 'bow');
-  ok(eq.ok && eq.state.equippedAccessory === 'bow', 'swap to bow');
+  const eq = gs.equipAccessory(f.state, 'scarf');
+  ok(eq.ok && eq.state.equippedAccessory === 'scarf', 'swap to scarf');
   ok(!gs.equipAccessory(f.state, 'crown').ok, 'cannot equip unowned');
   const rem = gs.equipAccessory(eq.state, null);
   ok(rem.ok && rem.state.equippedAccessory === null, 'remove accessory');
   ok(!gs.equipAccessory(rem.state, null).ok, 'no-op remove');
+
+  // Every catalog item must be purchasable at its listed price, auto-equip,
+  // and remain selectable/removable after purchase.
+  for (const item of gs.ACCESSORY_CATALOG) {
+    const affordable = { ...base(), coins: item.price };
+    const bought = gs.buyAccessory(affordable, item.id);
+    ok(bought.ok && bought.cost === item.price, `${item.id} buys at catalog price`);
+    ok(bought.state.coins === 0, `${item.id} deducts exact price`);
+    ok(bought.state.ownedAccessories.includes(item.id), `${item.id} is owned after purchase`);
+    ok(bought.state.equippedAccessory === item.id, `${item.id} auto-equips`);
+    ok(!gs.buyAccessory(bought.state, item.id).ok, `${item.id} cannot be bought twice`);
+    const removed = gs.equipAccessory(bought.state, null);
+    ok(removed.ok && removed.state.equippedAccessory === null, `${item.id} can be removed`);
+    const worn = gs.equipAccessory(removed.state, item.id);
+    ok(worn.ok && worn.state.equippedAccessory === item.id, `${item.id} can be re-equipped`);
+    const short = gs.buyAccessory({ ...base(), coins: Math.max(0, item.price - 1) }, item.id);
+    ok(!short.ok && !short.state.ownedAccessories.includes(item.id), `${item.id} stays locked when unaffordable`);
+  }
 
   // Theme: buy + equip
   let t = base();
@@ -357,14 +406,33 @@ console.log('== 10. Mascot / accessory / theme shops ==');
   ok(te.ok && te.state.activeTheme === 'blue', 'equip blue back');
   ok(!gs.equipTheme(tb.state, 'purple').ok, 'cannot equip unowned theme');
 
+  // Exercise each paid theme through purchase, persistence fields, and swaps.
+  for (const item of gs.THEME_CATALOG.filter(theme => theme.price > 0)) {
+    const affordable = { ...base(), coins: item.price };
+    const bought = gs.buyTheme(affordable, item.id);
+    ok(bought.ok && bought.cost === item.price, `${item.id} theme buys at catalog price`);
+    ok(bought.state.coins === 0, `${item.id} theme deducts exact price`);
+    ok(bought.state.ownedThemes.includes(item.id), `${item.id} theme is owned after purchase`);
+    ok(bought.state.activeTheme === item.id, `${item.id} theme auto-applies`);
+    ok(!gs.buyTheme(bought.state, item.id).ok, `${item.id} theme cannot be bought twice`);
+    const reverted = gs.equipTheme(bought.state, 'blue');
+    ok(reverted.ok && reverted.state.activeTheme === 'blue', `${item.id} can switch back to blue`);
+    const reapplied = gs.equipTheme(reverted.state, item.id);
+    ok(reapplied.ok && reapplied.state.activeTheme === item.id, `${item.id} can be re-applied`);
+    const short = gs.buyTheme({ ...base(), coins: item.price - 1 }, item.id);
+    ok(!short.ok && !short.state.ownedThemes.includes(item.id), `${item.id} stays locked when unaffordable`);
+  }
+  ok(!gs.buyTheme({ ...base(), coins: 1 }, 'blue').ok, 'free default blue theme is not bought twice');
+  ok(!gs.isAccessoryId('bow') && !gs.isAccessoryId('cap'), 'retired accessory ids are no longer in the shop');
+
   // Pets: earned (never bought), equip is free
   let m = base();
   ok(typeof gs.buyMascot === 'undefined', 'pets cannot be bought');
   ok(!gs.equipMascot(m, 'panda').ok, 'cannot equip a locked pet');
   m = gs.unlockEarnedPets({ ...m, totalSessions: 1 }).state;
-  const me = gs.equipMascot(m, 'cat');
-  ok(me.ok && me.state.activeMascot === 'cat' && me.state.coins === 0, 'equip earned cat for free');
-  ok(!gs.equipMascot(me.state, 'cat').ok, 'no-op equip of active pet');
+  const me = gs.equipMascot(m, 'bear');
+  ok(me.ok && me.state.activeMascot === 'bear' && me.state.coins === 0, 'equip earned bear for free');
+  ok(!gs.equipMascot(me.state, 'bear').ok, 'no-op equip of active pet');
 }
 
 console.log('== 11. Achievements ==');
@@ -535,14 +603,19 @@ console.log('== 16. Malformed save recovery ==');
     trees: -2,
     streakFreezes: 99,
     lastFocusDate: '2026-02-30',
-    ownedMascots: ['cat', 'cat', 'invalid'],
+    ownedMascots: ['cat', 'bear', 'cat', 'invalid'],
+    ownedAccessories: ['flower', 'bow', 'cap', 'bow', 'invalid'],
+    equippedAccessory: 'cap',
     ownedThemes: ['pink', 'pink', 'invalid'],
   }));
   ok(malformed.coins === 0 && malformed.currentStreak === 0, 'invalid numeric save fields are sanitized');
   ok(malformed.streakFreezes === gs.STREAK_FREEZE_MAX, 'freeze count is clamped');
   ok(malformed.lastFocusDate === null && malformed.dailyGoalClaimed === false, 'invalid dates and booleans are sanitized');
   ok(malformed.claimedDays.join(',') === '1,2,3', 'check-in save is canonicalized to a prefix');
-  ok(malformed.ownedMascots.join(',') === 'bear,cat', 'mascot ownership is valid and deduplicated');
+  ok(malformed.ownedMascots.join(',') === 'cat,bear', 'mascot ownership is valid and deduplicated');
+  ok(malformed.ownedAccessories.includes('flower') && malformed.ownedAccessories.includes('scarf') && malformed.ownedAccessories.includes('halo'), 'legacy accessory ownership maps to new designs');
+  ok(malformed.ownedAccessories.filter(id => id === 'scarf').length === 1, 'accessory migration deduplicates replacements');
+  ok(malformed.equippedAccessory === 'halo', 'equipped legacy cap maps to the halo');
   ok(malformed.ownedThemes.join(',') === 'blue,pink', 'theme ownership is valid and deduplicated');
   ok(load('null').coins === 0 && load('[]').coins === 0, 'non-object saves recover to defaults');
 
@@ -695,20 +768,24 @@ console.log('== 24. Pet collection: earn by focusing ==');
   const cat = gs.MASCOT_CATALOG;
   ok(cat.length === 22, `22 pets in the collection (got ${cat.length})`);
   ok(new Set(cat.map(p => p.id)).size === cat.length, 'pet ids are unique');
-  ok(cat[0].id === 'bear' && cat[0].unlock.kind === 'starter', 'bear is the starter');
+  for (const pet of cat) {
+    ok(fs.existsSync(path.join(__dirname, '..', 'public', 'pets', `${pet.id}.webp`)), `${pet.id} has portrait art`);
+  }
+  ok(cat[0].id === 'cat' && cat[0].unlock.kind === 'starter', 'cat is the starter');
+  ok(cat[1].id === 'bear' && cat[1].unlock.kind === 'sessions' && cat[1].unlock.value === 1, 'bear unlocks after one session');
   ok(cat.filter(p => p.unlock.kind === 'starter').length === 1, 'exactly one starter');
   for (const p of cat) {
     if (p.unlock.kind !== 'starter') ok(Number.isSafeInteger(p.unlock.value) && p.unlock.value > 0, `${p.id} has a positive goal`);
   }
   for (const id of ['panda', 'cat', 'dog', 'frog', 'fish', 'rabbit', 'mouse']) ok(gs.isMascotId(id), `${id} exists`);
 
-  // Fresh player owns only the bear.
-  ok(base().ownedMascots.join(',') === 'bear', 'new player starts with the bear');
+  // Fresh player owns only the cat.
+  ok(base().ownedMascots.join(',') === 'cat', 'new player starts with the cat');
 
-  // First completed session unlocks the cat.
+  // First completed session unlocks the bear.
   const first = gs.recordSession(base(), 60, NOW);
-  ok(first.result.newPets.join(',') === 'cat', 'first session unlocks the cat');
-  ok(first.state.ownedMascots.includes('cat') && first.state.activeMascot === 'bear', 'unlocked, not auto-equipped');
+  ok(first.result.newPets.join(',') === 'bear', 'first session unlocks the bear');
+  ok(first.state.ownedMascots.includes('bear') && first.state.activeMascot === 'cat', 'unlocked, not auto-equipped');
   const second = gs.recordSession(first.state, 60, NOW);
   ok(second.result.newPets.length === 0, 'no repeat unlock');
 
@@ -721,7 +798,7 @@ console.log('== 24. Pet collection: earn by focusing ==');
 
   // One long session can unlock several at once.
   const big = gs.recordSession(base(), 3600, NOW);
-  ok(['cat', 'chick', 'frog', 'rabbit'].every(id => big.result.newPets.includes(id)), '1 h session unlocks cat, chick, frog, rabbit');
+  ok(['bear', 'chick', 'frog', 'rabbit'].every(id => big.result.newPets.includes(id)), '1 h session unlocks bear, chick, frog, rabbit');
 
   // Streak-based pet.
   const streaky = gs.recordSession({ ...base(), currentStreak: 2, bestStreak: 2, lastFocusDate: '2026-08-17' }, 60, NOW);
@@ -729,13 +806,14 @@ console.log('== 24. Pet collection: earn by focusing ==');
 
   // Failed / rejected sessions unlock nothing.
   ok(gs.recordSession(base(), 5, NOW).result.newPets.length === 0, 'invalid session unlocks nothing');
-  ok(gs.awardFailConsolation(base(), 900).state.ownedMascots.join(',') === 'bear', 'failed session unlocks nothing');
+  ok(gs.awardFailConsolation(base(), 900).state.ownedMascots.join(',') === 'cat', 'failed session unlocks nothing');
 
   // Progress + goal text.
   const pp = gs.petProgress({ focusSeconds: 45 * 60, totalSessions: 3, bestStreak: 1 }, cat.find(p => p.id === 'rabbit'));
   ok(pp.current === 45 && pp.target === 60 && !pp.earned, 'rabbit progress 45/60');
   ok(gs.petGoalText(cat.find(p => p.id === 'dog')) === 'Focus 2 h in total', 'goal text in hours');
-  ok(gs.petGoalText(cat.find(p => p.id === 'cat')) === 'Finish your first session', 'first-session goal text');
+  ok(gs.petGoalText(cat.find(p => p.id === 'cat')) === 'Your first friend', 'starter goal text');
+  ok(gs.petGoalText(cat.find(p => p.id === 'bear')) === 'Finish your first session', 'first-session goal text');
   ok(gs.petRemainingText({ focusSeconds: 45 * 60, totalSessions: 0, bestStreak: 0 }, cat.find(p => p.id === 'rabbit')) === '15 min to go', 'remaining text');
 
   // Next goal = closest locked pet.
@@ -761,7 +839,7 @@ console.log('== 25. Pet migration from coin-shop saves ==');
   ok(legacy.ownedMascots.includes('cat') && legacy.ownedMascots.includes('chick'), 'stats already earned are credited on load');
   ok(!legacy.ownedMascots.includes('frog'), 'unearned pets stay locked');
   const unknown = load({ ownedMascots: ['bear', 'griffin'], activeMascot: 'griffin' });
-  ok(unknown.activeMascot === 'bear' && !unknown.ownedMascots.includes('griffin'), 'unknown pet ids are dropped');
+  ok(unknown.activeMascot === 'cat' && !unknown.ownedMascots.includes('griffin'), 'unknown pet ids are dropped');
 }
 
 console.log('== 26. Daily goal measures focus minutes, not session count ==');
@@ -927,15 +1005,47 @@ console.log('== 34. Daily goal has one rule for the UI and the payout ==');
   ok(gs.dailyGoalStatus({ ...base(), minutesToday: 99, dailyProgressDate: '2026-09-17' }, now).minutes === 0, 'stale progress reads 0 minutes today');
 }
 
-console.log('== 32. Coin economy stays a long-term goal ==');
+console.log('== 32. Coin economy audit: permanent cosmetics last beyond the first month ==');
 {
-  // 30 days at 25 min/day: a steady player still has things left to buy.
+  // Include every payout a steady player can claim, not just session coins.
   let s = base();
-  for (let d = 1; d <= 30; d++) s = gs.recordSession(s, 1500, D7(d)).state;
-  const catalogue = gs.ACCESSORY_CATALOG.reduce((n, a) => n + a.price, 0) + gs.THEME_CATALOG.reduce((n, t) => n + t.price, 0);
-  ok(catalogue >= 3800, `the cosmetic catalogue is a long-term goal (${catalogue} coins)`);
-  // 30 days of committed play should still be well short of the whole shop.
-  ok(s.coins / catalogue < 2, `30 days of 25-min focus (${s.coins}) is not multiples of the catalogue (${catalogue})`);
+  let firstCatalogDay = null;
+  const coreCatalogue = gs.ACCESSORY_CATALOG.reduce((n, a) => n + a.price, 0) + gs.THEME_CATALOG.reduce((n, t) => n + t.price, 0);
+  const sceneCatalogue = gs.PET_SCENE_CATALOG.reduce((n, scene) => n + scene.price, 0);
+  const featuredSceneCatalogue = gs.PET_SCENE_CATALOG.reduce((n, scene) => n + (scene.price > 0 ? Math.round(scene.price * 0.75) : 0), 0);
+  const catalogue = coreCatalogue + sceneCatalogue;
+  const bestPriceCatalogue = coreCatalogue + featuredSceneCatalogue;
+  for (let d = 1; d <= 30; d++) {
+    const now = D7(d);
+    s = gs.recordSession(s, 1500, now).state;
+    s = gs.claimDailyGoal(s, now).state;
+    s = gs.claimDailyBonus(s, now).state;
+    const due = gs.claimableCheckinDay(s, now);
+    if (due !== null) s = gs.claimDayReward(s, due, now).state;
+    if (firstCatalogDay === null && s.coins >= coreCatalogue) firstCatalogDay = d;
+  }
+  ok(coreCatalogue === 3880, `all accessories and themes cost ${coreCatalogue} coins`);
+  ok(sceneCatalogue === 30 * gs.PET_SCENE_PRICE, `30 pet scenes cost ${sceneCatalogue} coins`);
+  ok(featuredSceneCatalogue === 30 * Math.round(gs.PET_SCENE_PRICE * 0.75), `buying every scene on feature costs ${featuredSceneCatalogue} coins`);
+  ok(catalogue === 30880, `all permanent cosmetics cost ${catalogue} coins`);
+  ok(firstCatalogDay === 12, `full daily payouts make core cosmetics affordable by day ${firstCatalogDay}`);
+  ok(s.coins > coreCatalogue, `30 days of full daily payouts leave ${s.coins} coins after core cosmetics (${coreCatalogue})`);
+  ok(s.coins >= coreCatalogue + gs.PET_SCENE_PRICE * 8, 'a steady month can still buy eight scenes after the starter collection');
+  ok(s.coins < bestPriceCatalogue, `the full cosmetic set takes longer than one steady month even at featured prices (${bestPriceCatalogue} total)`);
+
+  // The shield is still a conditional repeatable spend, capped at one until
+  // the player uses it to protect a missed day.
+  const shield = gs.buyStreakFreeze(s, D7(30));
+  ok(shield.ok, 'the shield remains a conditional coin sink');
+  ok(!gs.buyStreakFreeze(shield.state, D7(30)).ok, 'a held shield caps that remaining sink');
+  s = shield.state;
+  for (const item of gs.ACCESSORY_CATALOG) s = gs.buyAccessory(s, item.id).state;
+  for (const item of gs.THEME_CATALOG) {
+    if (item.price > 0) s = gs.buyTheme(s, item.id).state;
+  }
+  ok(s.ownedAccessories.length === gs.ACCESSORY_CATALOG.length, 'all accessories can be cleared');
+  ok(s.ownedThemes.length === gs.THEME_CATALOG.length, 'all paid themes can be cleared');
+
   // Freezes cost about a day's earnings: protection is a real trade-off.
   const day = gs.recordSession(base(), 1500, NOW).result.coinsEarned;
   ok(gs.STREAK_FREEZE_COST > day / 2, `a freeze (${gs.STREAK_FREEZE_COST}) costs more than half a good day (${day})`);
@@ -943,6 +1053,98 @@ console.log('== 32. Coin economy stays a long-term goal ==');
   const longPerMin = gs.recordSession(base(), 1500, NOW).result.baseCoins / 25;
   const shortPerMin = gs.recordSession(base(), 300, NOW).result.baseCoins / 5;
   ok(shortPerMin <= longPerMin, 'short sessions never beat long ones per minute');
+}
+
+console.log('== 33. Pet scene shop rotates safely and keeps purchases ==');
+{
+  const catalog = gs.PET_SCENE_CATALOG ?? [];
+  ok(catalog.length === 31, `scene catalog has a free starter and 30 permanent scenes (${catalog.length})`);
+  ok(base().ownedPetScenes?.join(',') === 'classic', 'new players own the classic scene');
+  ok(base().equippedPetScene === 'classic', 'classic scene is equipped by default');
+
+  const monday = week => new Date(2026, 8, 7 + week * 7, 10);
+  const offersFor = gs.featuredPetScenes;
+  ok(typeof offersFor === 'function', 'scene shop exposes its current featured offers');
+  ok(typeof gs.buyPetScene === 'function', 'scene purchase has a guarded state transition');
+  ok(typeof gs.equipPetScene === 'function', 'scene equip has a guarded state transition');
+  if (typeof offersFor === 'function') {
+    const firstWeek = offersFor(monday(0));
+    const nextWeek = offersFor(monday(1));
+    ok(firstWeek.length === 3, 'exactly three scenes are featured at once');
+    ok(new Set(firstWeek.map(item => item.id)).size === 3, 'a weekly offer has no duplicate scenes');
+    ok(firstWeek.every(item => item.price > 0), 'the free starter is not sold again');
+    ok(firstWeek.map(item => item.id).join(',') !== nextWeek.map(item => item.id).join(','), 'weekly offers rotate');
+
+    const cycle = new Set();
+    for (let week = 0; week < 10; week++) {
+      for (const item of offersFor(monday(week))) cycle.add(item.id);
+    }
+    ok(cycle.size === 30, 'all 30 paid scenes return within the rotation');
+
+    const offer = firstWeek[0];
+    const featuredPrice = gs.petScenePrice(offer.id, monday(0));
+    const regular = catalog.find(item => item.price > 0 && !firstWeek.some(featured => featured.id === item.id));
+    ok(offer && gs.petScenePrice(offer.id, monday(0)) === Math.round(gs.PET_SCENE_PRICE * 0.75), 'featured scenes receive a 25% discount');
+    ok(regular && gs.petScenePrice(regular.id, monday(0)) === gs.PET_SCENE_PRICE, 'every scene remains available at its regular price');
+    const poor = gs.buyPetScene?.({ ...base(), coins: featuredPrice - 1 }, offer.id, monday(0));
+    ok(poor && !poor.ok && !poor.state.ownedPetScenes?.includes(offer.id), 'an unaffordable scene remains locked');
+    const bought = gs.buyPetScene?.({ ...base(), coins: featuredPrice }, offer.id, monday(0));
+    ok(bought?.ok && bought.cost === featuredPrice && bought.state.coins === 0, 'a featured scene costs exactly its discounted price');
+    ok(bought?.state.equippedPetScene === offer.id, 'a bought scene is equipped immediately');
+    ok(bought?.state.ownedPetScenes?.includes(offer.id), 'a bought scene remains in the collection');
+    ok(bought && !gs.buyPetScene(bought.state, offer.id, monday(0)).ok, 'a scene cannot be purchased twice');
+    const lockedEquip = gs.equipPetScene?.(base(), offer.id);
+    ok(!lockedEquip?.ok, 'a locked scene cannot be equipped');
+    ok(offersFor(monday(0)).some(item => item.id === offer.id), 'featured items stay predictable for the full week');
+    const switched = gs.equipPetScene?.(bought.state, 'classic');
+    ok(switched?.ok && switched.state.equippedPetScene === 'classic', 'owned scenes can be switched back to');
+    const boughtRegular = regular && gs.buyPetScene?.({ ...base(), coins: gs.PET_SCENE_PRICE }, regular.id, monday(0));
+    ok(boughtRegular?.ok && boughtRegular.cost === gs.PET_SCENE_PRICE, 'a non-featured scene can be bought at its full price');
+
+    const allSceneCost = catalog.reduce((sum, scene) => sum + gs.petScenePrice(scene.id, monday(0)), 0);
+    let fullCollection = { ...base(), coins: allSceneCost };
+    for (const scene of catalog.filter(item => item.price > 0)) {
+      fullCollection = gs.buyPetScene(fullCollection, scene.id, monday(0)).state;
+    }
+    ok(fullCollection.coins === 0, 'the complete scene collection charges the exact purchase total');
+    ok(fullCollection.ownedPetScenes.length === catalog.length, 'all scenes can be collected and retained');
+    ok(fullCollection.equippedPetScene === catalog[catalog.length - 1].id, 'the last purchase becomes the active scene');
+  }
+
+  const oldStorage = global.localStorage;
+  global.localStorage = { getItem: () => JSON.stringify({ coins: 42 }), setItem: () => {} };
+  const olderSave = gs.loadGameState();
+  ok(olderSave.ownedPetScenes.join(',') === 'classic' && olderSave.equippedPetScene === 'classic', 'older saves receive the safe classic scene');
+  let raw = JSON.stringify({
+    ownedPetScenes: ['classic', 'clouds-peach', 'invalid', 'clouds-peach'],
+    equippedPetScene: 'clouds-peach',
+  });
+  global.localStorage = { getItem: () => raw, setItem: (_key, value) => { raw = value; } };
+  const migrated = gs.loadGameState();
+  ok(migrated.ownedPetScenes?.filter(id => id === 'clouds-peach').length === 1, 'scene migration drops invalid and duplicate ids');
+  ok(migrated.equippedPetScene === 'clouds-peach', 'a valid owned scene stays equipped after loading');
+  gs.saveGameState(migrated);
+  ok(JSON.parse(raw).ownedPetScenes?.includes('clouds-peach') === true, 'scene ownership persists in the save');
+  global.localStorage = { getItem: () => JSON.stringify({ ownedPetScenes: ['classic'], equippedPetScene: 'clouds-peach' }), setItem: () => {} };
+  ok(gs.loadGameState().equippedPetScene === 'classic', 'a save cannot equip a scene the player does not own');
+  global.localStorage = oldStorage;
+}
+
+console.log('== 34. Appearance mode defaults and migrates ==');
+{
+  ok(base().appearanceMode === 'system', 'new saves follow the device appearance');
+  const saved = global.localStorage;
+  const load = value => {
+    global.localStorage = { getItem: () => value, setItem: () => {} };
+    return gs.loadGameState();
+  };
+  ok(load(JSON.stringify({ activeTheme: 'pink' })).appearanceMode === 'system', 'older saves default to system appearance');
+  ok(load(JSON.stringify({ appearanceMode: 'dark' })).appearanceMode === 'dark', 'saved dark appearance is restored');
+  ok(load(JSON.stringify({ appearanceMode: 'sepia' })).appearanceMode === 'system', 'invalid appearance recovers to system');
+  const dark = gs.setAppearanceMode(base(), 'dark');
+  ok(dark.appearanceMode === 'dark' && dark.activeTheme === 'blue', 'dark mode does not replace the accent theme');
+  ok(gs.setAppearanceMode(dark, 'system').appearanceMode === 'system', 'appearance can return to device setting');
+  global.localStorage = saved;
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

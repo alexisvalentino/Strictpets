@@ -1,5 +1,6 @@
 'use client';
 import Icon, { type IconName } from './Icon';
+import { nativeSelectionHaptic } from '../lib/native';
 
 export type TabKey = 'home' | 'focus' | 'rewards';
 
@@ -22,7 +23,7 @@ const TabBar = ({
 }) => (
   <nav
     aria-label="Primary"
-    className="flex shrink-0 justify-center border-t border-slate-200/70 bg-white/90 pt-1.5 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur-sm"
+    className="guide-tabbar flex shrink-0 justify-center border-t border-slate-200/70 bg-white/90 pt-1.5 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur-sm"
   >
     {/* Phones get the full-width bar; on tablets the same three targets stay
         grouped in the middle instead of drifting to opposite corners. */}
@@ -33,11 +34,14 @@ const TabBar = ({
         return (
           <button
             key={t.key}
-            onClick={() => onChange(t.key)}
+            onClick={() => {
+              if (!disabled && active !== t.key) nativeSelectionHaptic();
+              onChange(t.key);
+            }}
             disabled={disabled}
             aria-current={isActive ? 'page' : undefined}
             aria-label={badge ? `${t.label} — reward ready to claim` : undefined}
-            className={`flex min-h-11 flex-1 flex-col items-center gap-1 rounded-xl py-1.5 transition-colors ${
+            className={`flex min-h-11 flex-1 flex-col items-center gap-1 rounded-xl py-1.5 transition-[color,transform] active:scale-[0.97] ${
               isActive ? 'text-brand-600' : 'text-slate-400'
             } ${disabled ? 'opacity-50' : ''}`}
           >
@@ -61,7 +65,7 @@ const TabBar = ({
                 className={isActive ? 'scale-110 transition-transform' : 'transition-transform'}
               />
             </span>
-            <span className="text-[10px] font-black uppercase tracking-wide">
+            <span className="text-[11px] font-semibold tracking-tight">
               {t.label}
             </span>
           </button>

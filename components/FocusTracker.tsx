@@ -13,7 +13,12 @@ import TabBar, { type TabKey } from './TabBar';
 import DevTip from './DevTip';
 import { useGameState } from '../lib/useGameState';
 import { syncStatusBar } from '../lib/statusBar';
-import { requestReminderPermission, syncStreakReminder } from '../lib/native';
+import {
+  nativeImpactHaptic,
+  nativeSelectionHaptic,
+  requestReminderPermission,
+  syncStreakReminder,
+} from '../lib/native';
 import {
   DAILY_GOAL_REWARD,
   MASCOT_CATALOG,
@@ -22,6 +27,7 @@ import {
   activeStreak,
   awardFailConsolation,
   buyAccessory,
+  buyPetScene,
   buyStreakFreeze,
   buyTheme,
   canBuyStreakFreeze,
@@ -39,6 +45,7 @@ import {
   daysBetween,
   equipAccessory,
   equipMascot,
+  equipPetScene,
   equipTheme,
   isWeekend,
   markSessionRunning,
@@ -48,9 +55,12 @@ import {
   recordFailedAttempt,
   recordSession,
   repairStreak,
+  setAppearanceMode,
   todayKey,
+  type AppearanceMode,
   type AccessoryId,
   type MascotId,
+  type PetSceneId,
   type ThemeId,
 } from '../lib/gameState';
 
@@ -65,6 +75,7 @@ const DURATIONS = [
   { label: '5 min', seconds: 300 },
   { label: '25 min', seconds: 1500 },
 ];
+// Four fixed presets fit in the setup card; a virtual list would be harder to scan.
 
 // Motion detection tuning (DeviceMotion linear acceleration, m/s²).
 const MOTION_THRESHOLD = 3.0; // magnitude that counts as "the phone moved"
@@ -291,10 +302,29 @@ const FocusTracker = () => {
     if (phase === 'failed' || phase === 'done') scrollToTab('focus');
   }, [phase, scrollToTab]);
 
-  // Native status bar follows the app theme on both platforms.
-  useEffect(() => {
-    syncStatusBar();
-  }, [game.activeTheme]);
+  // Resolve System mode before paint, follow OS changes, and keep browser and
+  // native chrome aligned with the selected appearance and accent theme.
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const apply = () => {
+      const appearance =
+        game.appearanceMode === 'system'
+          ? media.matches ? 'dark' : 'light'
+          : game.appearanceMode;
+      root.dataset.theme = game.activeTheme;
+      root.dataset.appearance = appearance;
+      syncStatusBar(appearance);
+      document
+        .querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+        ?.setAttribute('content', appearance === 'dark' ? '#08172A' : '#0EA5E9');
+    };
+
+    apply();
+    if (game.appearanceMode !== 'system') return;
+    media.addEventListener('change', apply);
+    return () => media.removeEventListener('change', apply);
+  }, [game.activeTheme, game.appearanceMode]);
 
   // Keep exactly one gentle evening reminder scheduled for the current streak
   // (native only). Re-run whenever something that changes the plan changes.
@@ -395,8 +425,19 @@ const FocusTracker = () => {
     let disposed = false;
     let removeListener: (() => Promise<void>) | undefined;
     void App.addListener('backButton', () => {
+      // Back should unwind the most local UI first, then return from secondary
+      // tabs to Focus, and only then leave the app. Using scrollToTab keeps the
+      // visible page and selected tab in sync while the carousel settles.
+      if (repairPromptOpen) {
+        setRepairPromptOpen(false);
+        return;
+      }
+      if (customOpen) {
+        setCustomOpen(false);
+        return;
+      }
       if (activeTab !== 'focus') {
-        setActiveTab('focus');
+        scrollToTab('focus');
         return;
       }
       void App.exitApp();
@@ -408,7 +449,7 @@ const FocusTracker = () => {
       disposed = true;
       if (removeListener) void removeListener();
     };
-  }, [activeTab]);
+  }, [activeTab, customOpen, repairPromptOpen, scrollToTab]);
 
   // --- Movement detection (DeviceMotion API / accelerometer + gyroscope) ---
   // Fires natively in Android WebView; on iOS it only starts after the user
@@ -525,6 +566,7 @@ const FocusTracker = () => {
     sessionStartMonotonicRef.current = performance.now();
     phaseRef.current = 'running';
     setPhase('running');
+    nativeImpactHaptic(ImpactStyle.Light);
     successHandledRef.current = false;
     requestMotionPermission();
     // Create/resume the AudioContext from this user gesture so iOS allows
@@ -652,6 +694,30 @@ const FocusTracker = () => {
     hapticCollect();
   };
 
+  const buyPetSceneHandler = (id: PetSceneId) => {
+    const { state, ok } = buyPetScene(gameRef.current, id);
+    if (!ok) return;
+    update(() => state);
+    showPop('Pet scene unlocked', 'sparkle');
+    playCollectSound();
+    hapticCollect();
+  };
+
+  const equipPetSceneHandler = (id: PetSceneId) => {
+    const { state, ok } = equipPetScene(gameRef.current, id);
+    if (!ok) return;
+    update(() => state);
+    showPop('Pet scene applied', 'sparkle');
+    hapticCollect();
+  };
+
+  const setAppearanceModeHandler = (mode: AppearanceMode) => {
+    const state = setAppearanceMode(gameRef.current, mode);
+    if (state === gameRef.current) return;
+    update(() => state);
+    nativeSelectionHaptic();
+  };
+
   const progress = Math.min(100, (elapsed / duration) * 100);
   // Engine rule — the card, the completion message, the badge, and the payout
   // all read the same helper, so they cannot disagree.
@@ -673,11 +739,11 @@ const FocusTracker = () => {
     <IonContent
       fullscreen
       data-theme={game.activeTheme}
-      style={{ '--background': 'rgb(var(--sky-50, 240 249 255))' }}
+      style={{ '--background': 'transparent' }}
     >
       <div
         data-theme={game.activeTheme}
-        className="relative flex h-full w-full flex-col bg-gradient-to-b from-sky-100 via-sky-50 to-white"
+        className="guide-app relative flex h-full w-full flex-col bg-gradient-to-b from-sky-100 via-sky-50 to-white"
       >
         {/* reward toast (floats above whatever page is visible) */}
         {popText && (
@@ -700,12 +766,13 @@ const FocusTracker = () => {
               role="dialog"
               aria-modal="true"
               aria-labelledby="repair-prompt-title"
-              className="w-full max-w-sm rounded-3xl bg-white p-5 text-center shadow-xl"
+              className="guide-panel w-full max-w-sm rounded-3xl bg-white p-5 text-center shadow-xl"
             >
               <Mascot
                 mood="idle"
                 variant={game.activeMascot}
                 accessory={game.equippedAccessory}
+                scene={game.equippedPetScene}
                 className="mx-auto mb-3 h-20 w-20"
               />
               <h2 id="repair-prompt-title" className="flex items-center justify-center gap-1.5 text-lg font-black text-slate-900">
@@ -719,9 +786,9 @@ const FocusTracker = () => {
               <button
                 onClick={repairAndStart}
                 disabled={game.coins < STREAK_REPAIR_COST}
-                className={`mt-5 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-2xl py-3 text-sm font-black uppercase tracking-wide transition-transform active:scale-95 ${
+                className={`mt-5 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-2xl py-3 text-sm font-bold transition-transform active:scale-95 ${
                   game.coins >= STREAK_REPAIR_COST
-                    ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-white shadow-md shadow-amber-500/30'
+                    ? 'bg-gradient-to-r from-amber-800 to-amber-700 text-white shadow-md shadow-amber-700/30'
                     : 'cursor-not-allowed bg-slate-100 text-slate-400'
                 }`}
               >
@@ -739,13 +806,13 @@ const FocusTracker = () => {
               </button>
               <button
                 onClick={startWithoutRepair}
-                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white py-3 text-sm font-black uppercase tracking-wide text-slate-600 transition-transform active:scale-95"
+                className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 bg-white py-3 text-sm font-semibold text-slate-600 transition-transform active:scale-95"
               >
                 Start a new streak
               </button>
               <button
                 onClick={() => setRepairPromptOpen(false)}
-                className="mt-2 w-full py-2 text-xs font-bold text-slate-400"
+                className="mt-2 flex min-h-11 w-full items-center justify-center py-2 text-xs font-bold text-slate-500"
               >
                 Not now
               </button>
@@ -775,71 +842,88 @@ const FocusTracker = () => {
             canBuyShield={canBuyStreakFreeze(game)}
             mascot={game.activeMascot}
             accessory={game.equippedAccessory}
+            petScene={game.equippedPetScene}
             petName={petName}
             totalSessions={game.totalSessions}
             focusSeconds={game.focusSeconds}
             onRepair={repairStreakHandler}
             onBuyShield={buyFreezeHandler}
-            onOpenRewards={() => scrollToTab('rewards')}
+            onOpenRewards={() => {
+              if (activeTab !== 'rewards') nativeSelectionHaptic();
+              scrollToTab('rewards');
+            }}
           />
 
           {/* Focus page — the tracker, the priority */}
-          <div className="flex h-full w-full shrink-0 snap-start flex-col overflow-y-auto">            <div className="my-auto mx-auto w-full max-w-md px-4 py-6 pl-[max(1rem,var(--safe-area-left))] pr-[max(1rem,var(--safe-area-right))] sm:px-6 md:max-w-lg lg:max-w-2xl">
-              {phase !== 'idle' && (
-                <div className="mb-10 text-center">
-                  <h1 className="text-sm font-black uppercase tracking-[0.35em] text-brand-600">
-                    Focus Tracker
-                  </h1>
-                </div>
-              )}
-
+          <div className="flex h-full w-full shrink-0 snap-start flex-col overflow-y-auto">
+            <div className="my-auto mx-auto w-full max-w-md px-4 py-6 pl-[max(1rem,var(--safe-area-left))] pr-[max(1rem,var(--safe-area-right))] sm:px-6 md:max-w-lg lg:max-w-2xl">
               {phase === 'idle' && (
-                <div className="text-center">
-                  <div className="mb-5 flex items-center justify-center gap-2">
-                    <span className="flex items-center gap-1 rounded-full border border-amber-200 bg-white/80 px-3 py-1 text-xs font-bold text-amber-500 shadow-sm">
+                <div className="focus-state-enter">
+                  <header className="mb-3 flex items-center justify-between gap-2.5">
+                  <h1 className="text-2xl font-black tracking-tight text-slate-900">
+                    Focus
+                  </h1>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <span className="flex min-h-9 items-center gap-1 rounded-full border border-amber-200 bg-white/80 px-2.5 text-[11px] font-bold text-amber-600">
                       <Icon name="flame" size={13} />
                       {activeStreak(game)} day{activeStreak(game) === 1 ? '' : 's'}
                     </span>
-                    <span className="flex items-center gap-1 rounded-full border border-sky-100 bg-white/80 px-3 py-1 text-xs font-bold tabular-nums text-brand-600 shadow-sm">
+                    <span className="flex min-h-9 items-center gap-1 rounded-full border border-sky-100 bg-white/80 px-2.5 text-[11px] font-bold tabular-nums text-brand-700">
                       <Icon name="coin" size={13} />
                       {game.coins}
                     </span>
                   </div>
+                  </header>
 
                   {/* tracker hero card */}
-                  <div className="rounded-3xl border border-slate-200/70 bg-white/80 p-6 shadow-sm backdrop-blur-sm">
-                    <Mascot
-                      mood="idle"
-                      variant={game.activeMascot}
-                      accessory={game.equippedAccessory}
-                      className="mx-auto mb-4 h-28 w-28"
-                    />
+                  <div className="focus-setup-panel rounded-[28px] p-4 sm:p-5">
+                    <div className="grid grid-cols-[minmax(0,1fr)_9.5rem] items-center gap-1">
+                      <h2 className="max-w-[12rem] text-3xl font-black leading-tight tracking-tight text-slate-900">
+                        How long?
+                      </h2>
+                      <div className="guide-pet-stage relative mx-auto flex h-[9.5rem] w-[9.5rem] items-center justify-center">
+                        <Mascot
+                          mood="idle"
+                          variant={game.activeMascot}
+                          accessory={game.equippedAccessory}
+                          scene={game.equippedPetScene}
+                          className="guide-pet-float relative z-10 h-[9.5rem] w-[9.5rem]"
+                        />
+                        <Icon
+                          name="sparkle"
+                          size={13}
+                          className="absolute right-3 top-4 z-10 text-sky-500"
+                          aria-hidden="true"
+                        />
+                      </div>
+                    </div>
 
-                    <h2 className="flex flex-wrap items-center justify-center gap-x-1.5 text-xl font-black leading-snug text-slate-900">
-                      {petName} is ready to focus with you
-                      <Icon name="paw" size={17} className="text-slate-300" />
-                    </h2>
-                    <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                      Pick a goal, press start, then set the phone down. A tap
-                      or a bump wakes {petName} up and the timer starts over.
-                    </p>
-                    <div className="mt-6 grid grid-cols-4 gap-2">
-                      {DURATIONS.map(d => (
-                        <button
-                          key={d.seconds}
-                          onClick={() => {
-                            setDuration(d.seconds);
-                            setCustomOpen(false);
-                          }}
-                          className={`min-h-11 rounded-xl py-2.5 text-xs font-bold transition-all ${
-                            duration === d.seconds
-                              ? 'bg-brand-600 text-white shadow-sm'
-                              : 'border border-slate-200 bg-white text-slate-600 shadow-sm active:scale-95'
-                          }`}
-                        >
-                          {d.label}
-                        </button>
-                      ))}
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      {DURATIONS.map(d => {
+                        const selected = duration === d.seconds;
+                        return (
+                          <button
+                            key={d.seconds}
+                            aria-pressed={selected}
+                            onClick={() => {
+                              if (!selected) nativeSelectionHaptic();
+                              setDuration(d.seconds);
+                              setCustomOpen(false);
+                            }}
+                            className={`focus-duration-choice flex min-h-14 items-center gap-2 rounded-2xl border px-2.5 py-2 text-sm font-bold transition-[background-color,border-color,color,box-shadow,transform] duration-200 active:scale-[0.97] ${
+                              selected
+                                ? 'border-brand-400 bg-brand-50 text-brand-800 shadow-sm ring-1 ring-brand-100'
+                                : 'border-sky-100 bg-white/70 text-slate-700'
+                            }`}
+                          >
+                            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${selected ? 'bg-brand-600 text-white' : 'bg-sky-100 text-brand-700'}`}>
+                              <Icon name="timer" size={15} tone="inherit" />
+                            </span>
+                            <span className="min-w-0 flex-1">{d.label}</span>
+                            {selected && <Icon name="check" size={14} tone="inherit" />}
+                          </button>
+                        );
+                      })}
                     </div>
 
                     {/* custom duration */}
@@ -851,10 +935,12 @@ const FocusTracker = () => {
                             min={0}
                             max={240}
                             inputMode="numeric"
+                            aria-label="Minutes"
+                            enterKeyHint="done"
                             placeholder="min"
                             value={customMin}
                             onChange={e => setCustomMin(e.target.value)}
-                            className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-2 text-center text-sm font-bold text-slate-800 focus:border-brand-400 focus:outline-none"
+                            className="min-h-11 w-16 rounded-lg border border-slate-200 bg-white px-2 py-2 text-center text-sm font-bold text-slate-800 focus:border-brand-400 focus:outline-none"
                           />
                           <span className="text-sm font-black text-slate-500">:</span>
                           <input
@@ -862,14 +948,16 @@ const FocusTracker = () => {
                             min={0}
                             max={59}
                             inputMode="numeric"
+                            aria-label="Seconds"
+                            enterKeyHint="done"
                             placeholder="sec"
                             value={customSec}
                             onChange={e => setCustomSec(e.target.value)}
-                            className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-2 text-center text-sm font-bold text-slate-800 focus:border-brand-400 focus:outline-none"
+                            className="min-h-11 w-16 rounded-lg border border-slate-200 bg-white px-2 py-2 text-center text-sm font-bold text-slate-800 focus:border-brand-400 focus:outline-none"
                           />
                           <button
                             onClick={applyCustom}
-                            className="flex-1 min-h-11 rounded-lg bg-brand-600 py-2 text-xs font-black uppercase tracking-wide text-white transition-transform active:scale-95"
+                            className="flex-1 min-h-11 rounded-lg bg-brand-700 py-2 text-xs font-bold text-white transition-transform active:scale-95"
                           >
                             Set
                           </button>
@@ -882,11 +970,11 @@ const FocusTracker = () => {
                           </button>
                         </div>
                         <p className="mt-1.5 text-[10px] font-semibold text-slate-400">
-                          Range 10 sec – 4 h · coins are minted per 10 sec focused
+                          10 sec–4 h · coins per 10 sec
                         </p>
                       </div>
                     ) : (
-                      <button
+                        <button
                         onClick={() => {
                           setCustomOpen(true);
                           // Pre-fill the editor from the active custom goal.
@@ -895,37 +983,32 @@ const FocusTracker = () => {
                             setCustomSec(String(duration % 60));
                           }
                         }}
-                        className={`mt-2 min-h-11 w-full rounded-xl border border-dashed py-2.5 text-xs font-bold transition-all ${
+                        className={`mt-2 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-dashed px-3 py-2.5 text-sm font-semibold transition-[background-color,border-color,color,transform] active:scale-[0.99] ${
                           !DURATIONS.some(d => d.seconds === duration)
                             ? 'border-brand-400 bg-brand-50 text-brand-600'
                             : 'border-slate-300 bg-white/60 text-slate-500 active:scale-[0.99]'
                         }`}
                       >
+                        <Icon name="timer" size={14} className="shrink-0" />
                         {!DURATIONS.some(d => d.seconds === duration)
                           ? `Custom · ${formatDurationLabel(duration)}`
-                          : '＋ Custom duration'}
+                          : 'Custom duration'}
                       </button>
                     )}
 
                     <button
                       onClick={onStartPressed}
-                      className="mt-5 w-full rounded-2xl bg-gradient-to-r from-sky-500 to-brand-600 py-4 text-lg font-black tracking-wide text-white shadow-lg shadow-brand-600/30 transition-transform active:scale-95"
+                      className="guide-primary-cta mt-4 flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-600 to-brand-700 py-3.5 text-lg font-bold text-white shadow-lg shadow-brand-600/25 transition-transform active:scale-[0.98]"
                     >
-                      START FOCUS
+                      Start focus
+                      <Icon name="chevronRight" size={18} tone="inherit" />
                     </button>
                   </div>
                 </div>
               )}
 
               {phase === 'running' && (
-                <div className="text-center">
-                  <Mascot
-                    mood="running"
-                    variant={game.activeMascot}
-                    accessory={game.equippedAccessory}
-                    className="mx-auto mb-6 h-16 w-16"
-                  />
-
+                <div className="guide-state-panel focus-state-enter text-center">
                   {/* circular gradient progress ring */}
                   <div
                     role="progressbar"
@@ -934,13 +1017,13 @@ const FocusTracker = () => {
                     aria-valuemax={duration}
                     aria-valuenow={elapsed}
                     aria-valuetext={`${formatTime(elapsed)} elapsed of ${formatTime(duration)}`}
-                    className="relative mx-auto h-60 w-60"
+                    className="guide-timer-orbit relative mx-auto h-64 w-64"
                   >
                     <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
                       <defs>
                         <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                           <stop offset="0%" style={{ stopColor: 'rgb(var(--sky-400, 56 189 248))' }} />
-                          <stop offset="100%" style={{ stopColor: 'rgb(var(--brand-600, 26 109 255))' }} />
+                          <stop offset="100%" style={{ stopColor: 'rgb(var(--brand-600, 23 102 243))' }} />
                         </linearGradient>
                       </defs>
                       <circle
@@ -968,7 +1051,10 @@ const FocusTracker = () => {
                       />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <div className="text-5xl font-black tabular-nums text-slate-900">
+                      <p className="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-brand-600">
+                        Focus time
+                      </p>
+                      <div className="text-5xl font-black tabular-nums tracking-tight text-slate-900">
                         {formatTime(elapsed)}
                       </div>
                       <div className="mt-1 text-xs font-semibold uppercase tracking-widest text-slate-500">
@@ -977,24 +1063,26 @@ const FocusTracker = () => {
                     </div>
                   </div>
 
-                  <p className="mt-8 text-2xl font-bold text-slate-800">
-                    Shh… {petName} is focusing with you.
-                  </p>
-                  <p className="mt-2 text-sm font-semibold text-amber-500">
-                    Leave the phone resting until the timer finishes.
-                  </p>
-                  <p className="mt-4 text-xs text-slate-500">
-                    A tap or a bump will wake {petName} and restart the timer.
+                  <Mascot
+                    mood="running"
+                    variant={game.activeMascot}
+                    accessory={game.equippedAccessory}
+                    scene={game.equippedPetScene}
+                    className="mx-auto -mt-1 h-24 w-24"
+                  />
+                  <p className="mx-auto mt-3 max-w-xs text-sm font-semibold text-slate-600">
+                    Keep your phone still until the timer ends.
                   </p>
                 </div>
               )}
 
               {phase === 'failed' && (
-                <div className="text-center" role="alert">
+                <div className="guide-state-panel focus-state-enter text-center" role="alert">
                   <Mascot
                     mood="sad"
                     variant={game.activeMascot}
                     accessory={game.equippedAccessory}
+                    scene={game.equippedPetScene}
                     className="mx-auto mb-6 h-28 w-28"
                   />
                   <h2 className="select-none text-4xl font-black leading-tight text-amber-500">
@@ -1009,11 +1097,11 @@ const FocusTracker = () => {
                           ? 'The app closed during your session.'
                         : `${petName} noticed you left the app.`}
                   </p>
-                  <p className="mt-2 text-sm text-slate-500">
-                    {failReason === 'interrupted'
-                      ? `Sessions can't continue after a restart. ${petName} is ready when you are.`
-                      : `Every try builds the habit. ${petName} is ready for another round.`}
-                  </p>
+                  {failReason === 'interrupted' && (
+                    <p className="mt-2 text-sm text-slate-500">
+                      Sessions stop when the app restarts.
+                    </p>
+                  )}
                   {failedStreak && (
                     <p className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700">
                       Your streak paused here. {petName} will be waiting
@@ -1027,38 +1115,45 @@ const FocusTracker = () => {
                   )}
                   <button
                     onClick={reset}
-                    className="mt-10 w-full rounded-2xl bg-gradient-to-r from-sky-500 to-brand-600 py-4 text-lg font-black tracking-wide text-white shadow-lg shadow-brand-600/30 transition-transform active:scale-95"
+                    className="guide-primary-cta mt-10 w-full rounded-2xl bg-gradient-to-r from-brand-600 to-brand-700 py-4 text-lg font-bold text-white shadow-lg shadow-brand-600/25 transition-transform active:scale-[0.98]"
                   >
-                    TRY AGAIN
+                    Try again
                   </button>
                 </div>
               )}
 
               {phase === 'done' && (
-                <div className="relative text-center" role="status" aria-live="polite">
+                <div className="guide-state-panel focus-state-enter relative rounded-[28px] border border-sky-100 bg-white p-5 text-center shadow-sm sm:p-6" role="status" aria-live="polite">
                   {(lastNewRecord || lastNewPets.length > 0) && <ConfettiBurst />}
                   <Mascot
                     mood="happy"
                     variant={game.activeMascot}
                     accessory={game.equippedAccessory}
-                    className="mx-auto mb-6 h-28 w-28"
+                    scene={game.equippedPetScene}
+                    className="mx-auto mb-3 h-36 w-36"
                   />
-                  <div className="text-7xl font-black tabular-nums text-emerald-500">
-                    {formatTime(duration)}
-                  </div>
-                  <p className="mt-8 flex items-center justify-center gap-2 text-2xl font-bold text-emerald-600">
+                  <h2 className="flex items-center justify-center gap-2 text-3xl font-black tracking-tight text-brand-700">
                     You did it!
                     <Icon name="sparkle" size={22} />
-                  </p>
-                  <p className="mt-2 flex items-center justify-center gap-1.5 text-sm text-slate-500">
-                    {petName} is so proud of you.
-                    <Icon name="paw" size={13} className="text-slate-300" />
-                  </p>
-                  <p className="mt-2 text-sm font-bold text-slate-600">
-                    +{lastCoinsEarned} coins · {activeStreak(game)}-day streak
-                  </p>
+                  </h2>
+                  <dl className="mt-5 grid grid-cols-3 divide-x divide-sky-100 rounded-2xl bg-sky-50/70 py-3">
+                    <div className="px-1.5">
+                      <dd className="text-base font-black tabular-nums text-slate-900">{formatTime(duration)}</dd>
+                      <dt className="mt-1 text-[10px] font-bold text-slate-500">Focused</dt>
+                    </div>
+                    <div className="px-1.5">
+                      <dd className="flex items-center justify-center gap-1 text-base font-black tabular-nums text-brand-700">
+                        +{lastCoinsEarned}<Icon name="coin" size={12} />
+                      </dd>
+                      <dt className="mt-1 text-[10px] font-bold text-slate-500">Coins earned</dt>
+                    </div>
+                    <div className="px-1.5">
+                      <dd className="text-base font-black tabular-nums text-slate-900">{activeStreak(game)}d</dd>
+                      <dt className="mt-1 text-[10px] font-bold text-slate-500">Streak</dt>
+                    </div>
+                  </dl>
                   {lastFreezeUsed > 0 && (
-                    <p className="mt-1 text-xs font-black text-sky-600">
+                    <p className="mt-1 text-xs font-black text-sky-700">
                       Freeze saved your streak!
                     </p>
                   )}
@@ -1075,7 +1170,7 @@ const FocusTracker = () => {
                   {/* `dailyGoalReached` means claimable, so this never promises
                       coins that are already banked or not yet earned. */}
                   {dailyGoalReached && (
-                    <p className="mt-1 text-xs font-semibold text-emerald-600">
+                    <p className="mt-1 text-xs font-semibold text-brand-700">
                       Daily goal reached! Claim +{DAILY_GOAL_REWARD} coins on the
                       Rewards tab
                     </p>
@@ -1083,9 +1178,9 @@ const FocusTracker = () => {
 
                   {/* new friends met this session */}
                   {lastNewPets.length > 0 ? (
-                    <div className="mt-5 rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-50 to-white p-3">
-                      <p className="text-xs font-black uppercase tracking-widest text-amber-600">
-                        New friend{lastNewPets.length === 1 ? '' : 's'} unlocked!
+                    <div className="guide-new-friend mt-5 rounded-2xl border border-sky-200 p-3">
+                      <p className="text-xs font-black text-brand-700">
+                        New friend{lastNewPets.length === 1 ? '' : 's'} met!
                       </p>
                       <div className="mt-2 flex flex-wrap justify-center gap-3">
                         {lastNewPets.map(id => {
@@ -1097,7 +1192,7 @@ const FocusTracker = () => {
                               {game.activeMascot !== id && (
                                 <button
                                   onClick={() => equipMascotHandler(id)}
-                                  className="mt-1 rounded-lg border border-brand-400 bg-white px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-brand-600 transition-transform active:scale-95"
+                                  className="guide-new-friend-action mt-1 flex min-h-11 items-center justify-center rounded-xl border border-brand-300 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-wide text-brand-700 transition-transform active:scale-[0.98]"
                                 >
                                   Focus together
                                 </button>
@@ -1116,9 +1211,9 @@ const FocusTracker = () => {
                   ) : null}
                   <button
                     onClick={reset}
-                    className="mt-10 w-full rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 py-4 text-lg font-black tracking-wide text-white shadow-lg shadow-emerald-500/30 transition-transform active:scale-95"
+                    className="guide-success-cta mt-8 min-h-12 w-full rounded-2xl bg-gradient-to-r from-brand-600 to-brand-700 py-3.5 text-base font-bold text-white shadow-md shadow-brand-600/20 transition-transform active:scale-[0.98]"
                   >
-                    FINISH
+                    Finish
                   </button>
                 </div>
               )}
@@ -1137,6 +1232,9 @@ const FocusTracker = () => {
             equippedAccessory={game.equippedAccessory}
             ownedThemes={game.ownedThemes}
             activeTheme={game.activeTheme}
+            ownedPetScenes={game.ownedPetScenes}
+            equippedPetScene={game.equippedPetScene}
+            appearanceMode={game.appearanceMode}
             longestSession={game.longestSession}
             bestStreak={game.bestStreak}
             jackpots={game.jackpots}
@@ -1155,6 +1253,9 @@ const FocusTracker = () => {
             onEquipAccessory={equipAccessoryHandler}
             onBuyTheme={buyThemeHandler}
             onEquipTheme={equipThemeHandler}
+            onBuyPetScene={buyPetSceneHandler}
+            onEquipPetScene={equipPetSceneHandler}
+            onSetAppearanceMode={setAppearanceModeHandler}
           />
         </div>
 

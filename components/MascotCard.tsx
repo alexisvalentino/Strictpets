@@ -9,21 +9,22 @@ import {
   type MascotId,
   type PetInfo,
   type PetStats,
+  type PetSceneId,
 } from '../lib/gameState';
 
 const MascotCard = ({
-  streak,
   petName,
-  mascot = 'bear',
+  mascot = 'cat',
   accessory = null,
+  scene = 'classic',
   nextPet = null,
   stats,
   ownedCount,
 }: {
-  streak: number;
   petName: string;
   mascot?: MascotId;
   accessory?: AccessoryId | null;
+  scene?: PetSceneId;
   nextPet?: PetInfo | null; // closest locked pet, null when all are unlocked
   stats: PetStats;
   ownedCount: number;
@@ -33,29 +34,26 @@ const MascotCard = ({
     ? Math.min(100, Math.floor((progress.current / progress.target) * 100))
     : 100;
   return (
-    <section className="mt-4 w-full rounded-2xl border border-slate-200/70 bg-white p-4 text-left shadow-sm">
-      <div className="flex items-center gap-4">
-        <Mascot
-          mood="idle"
-          variant={mascot}
-          accessory={accessory}
-          className="h-20 w-20 shrink-0"
-        />
-        <div className="min-w-0">
-          <p className="text-sm font-black text-slate-900">{petName}</p>
-          {/* The streak is the hero band's headline; this card is about the pet
-              you are focusing with, so it never repeats the number. */}
-          <p className="mt-1 flex items-start gap-1 text-xs leading-relaxed text-slate-500">
-            {streak > 0
-              ? 'Loves focusing with you every day'
-              : 'Ready for your first session together'}
-            <Icon name="paw" size={12} className="mt-0.5 shrink-0 text-slate-300" />
-          </p>
+    <section className="relative mt-4 w-full overflow-hidden rounded-[26px] border border-white/85 bg-white/55 p-3 text-left shadow-xl shadow-sky-700/10 backdrop-blur-xl">
+      <div className="grid grid-cols-[minmax(0,1fr)_7.5rem] items-center gap-2">
+        <div className="min-w-0 pl-1">
+          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-brand-600">Your companion</p>
+          <p className="mt-1 text-xl font-black leading-tight tracking-tight text-slate-900">{petName}</p>
+        </div>
+        <div className="guide-pet-stage relative mx-auto flex h-28 w-28 items-center justify-center">
+          <Mascot
+            mood="idle"
+            variant={mascot}
+            accessory={accessory}
+            scene={scene}
+            className="guide-pet-float relative z-10 h-28 w-28"
+          />
+          <Icon name="sparkle" size={13} className="absolute right-1 top-3 z-10 text-sky-500" aria-hidden="true" />
         </div>
       </div>
 
-      {/* next friend in the collection */}
-      <div className="mt-3 flex items-center gap-3 rounded-xl border border-sky-100 bg-sky-50/60 p-2.5">
+      {/* The next unlock is the waypoint that carries the journey forward. */}
+      <div className="guide-route mt-1 flex items-center gap-3 border-t border-sky-100/80 px-1 pt-3">
         {nextPet ? (
           <>
             <div className="shrink-0 opacity-50 grayscale">
@@ -63,10 +61,10 @@ const MascotCard = ({
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
-                <p className="truncate text-[11px] font-black text-slate-700">
-                  Next friend: {nextPet.name}
+                <p className="truncate text-xs font-bold text-slate-700">
+                  Next · {nextPet.name}
                 </p>
-                <span className="shrink-0 text-[10px] font-black tabular-nums text-brand-600">
+                <span className="shrink-0 text-[10px] font-bold tabular-nums text-brand-600">
                   {petRemainingText(stats, nextPet)}
                 </span>
               </div>
@@ -79,13 +77,12 @@ const MascotCard = ({
                 className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-sky-100"
               >
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-sky-400 to-brand-600 transition-all duration-700"
+                  className="h-full rounded-full bg-gradient-to-r from-sky-400 to-brand-600 transition-colors duration-300"
                   style={{ width: `${pct}%` }}
                 />
               </div>
-              <p className="mt-1 flex items-center gap-1 text-[10px] font-semibold text-slate-400">
-                {ownedCount}/{MASCOT_CATALOG.length} friends · see them all in Rewards
-                <Icon name="chevronRight" size={10} className="shrink-0" />
+              <p className="mt-1 text-[10px] font-semibold text-slate-400">
+                {ownedCount}/{MASCOT_CATALOG.length} friends
               </p>
             </div>
           </>

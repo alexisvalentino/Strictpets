@@ -2,11 +2,22 @@
 // Every function is a safe no-op on the web build and never throws — the
 // game must keep working if a plugin is missing or a permission is denied.
 import { Capacitor } from '@capacitor/core';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Preferences } from '@capacitor/preferences';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { STORAGE_KEY, streakReminderPlan, type GameState } from './gameState';
 
 const isNative = (): boolean => Capacitor.isNativePlatform();
+
+export const nativeSelectionHaptic = (): void => {
+  if (!isNative()) return;
+  void Haptics.selectionChanged().catch(() => {});
+};
+
+export const nativeImpactHaptic = (style: ImpactStyle = ImpactStyle.Light): void => {
+  if (!isNative()) return;
+  void Haptics.impact({ style }).catch(() => {});
+};
 
 // --- Progress backup ---
 // WebView localStorage can be purged by the OS (iOS under storage pressure,
@@ -58,7 +69,7 @@ export const syncStreakReminder = async (s: GameState, petName: string): Promise
       notifications: [
         {
           id: REMINDER_ID,
-          title: plan.kind === 'keep' ? `${petName} misses you 🐾` : `${petName} saved your spot 🐾`,
+          title: plan.kind === 'keep' ? `${petName} misses you` : `${petName} saved your spot`,
           body:
             plan.kind === 'keep'
               ? `Your ${days} is waiting. A short focus session together keeps it going!`
