@@ -1,55 +1,113 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules/
 /.pnp
 .pnp.js
 
 # testing
-/coverage
+coverage/
 /.tmp-gs
 /.tmp-gallery
 
+# local build caches (keep Gradle wrapper files tracked)
+/.gradle/
+
 # next.js
-/.next/
-/out/
+.next/
+out/
+dist/
 
 # android build output and packaged artifacts
 /android/.gradle/
 /android/build/
 /android/app/build/
 /android/capacitor-cordova-android-plugins/build/
+android/local.properties
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
 *.apk
 *.aab
 
 # production
-/build
+build/
+.vercel/
 
 # misc
 .DS_Store
-*.pem
+Thumbs.db
 
 # debug
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 tsconfig.tsbuildinfo
 
-# local env files
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# environment and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+.secret
+.secrets
+*.secret
+*.secrets
+*.credentials
+*.credentials.json
+/secret/
+/secrets/
+/credentials/
+/secret.json
+/secrets.json
+/credentials.json
+key.properties
+keystore.properties
+*.keystore
+*.jks
+*.pem
+*.p12
+*.pfx
+*.p8
+*.cer
+*.mobileprovision
+*.provisionprofile
 
-# vercel
-.vercel
+# local conversation exports (Codex chat history is stored outside this repo)
+/chat-history/
+/conversation-history/
+/conversations/
+*.chatlog
+*.conversation.json
+
+# IDE
+.idea/
+*.iml
+.vscode/
 
 # local agent tooling
-/.agents
-/.freebuff
-/.skills
+.agents/
+.codex/
+.freebuff/
+.skills/
+.clinerules/
+.impeccable/
+stitch_ging_qr_alarm_app/
 
-# release keystore and credentials (NEVER commit these)
-*.jks
-*.keystore
-keystore.properties
+# generated design studies, model downloads, and unrelated local notes
+output/
+tmp/
+gingdesignmd.md
+
+# image-generation sidecar metadata is not used at runtime
+/public/icons/*.webp.json
+/public/pets/*.webp.json
+
+# iOS signing material and build products
+ios/App/Pods/
+ios/App/build/
+ios/App/DerivedData/
+ios/App/App/public/
+ios/App/App/capacitor.config.json
+xcuserdata/
+*.xcuserstate
