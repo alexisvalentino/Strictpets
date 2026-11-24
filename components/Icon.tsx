@@ -58,6 +58,7 @@ export type IconName =
   | 'rocket'
   | 'wings'
   | 'timer'
+  | 'pawMedal'
   // actions & states
   | 'check'
   | 'lock'
@@ -94,6 +95,7 @@ const IDENTITY: Partial<Record<IconName, ResolvedTone>> = {
   crown: 'amber',
   trophy: 'amber',
   medal: 'amber',
+  pawMedal: 'amber',
   star: 'amber',
   sparkle: 'amber',
   bolt: 'amber',
@@ -209,8 +211,13 @@ const GLYPHS: Record<IconName, JSX.Element> = {
   coin: (
     <>
       <circle cx="12" cy="12" r="8.6" />
-      <circle cx="12" cy="12" r="5.4" opacity="0.45" />
-      <P d="M9.9 12.7c0 .9.9 1.5 2.1 1.5s2.1-.6 2.1-1.5-.9-1.4-2.1-1.7-2.1-.8-2.1-1.7.9-1.5 2.1-1.5 2.1.6 2.1 1.5" />
+      <circle cx="12" cy="12" r="6.4" opacity="0.4" />
+      <g transform="translate(4.9 4.2) scale(0.59)" fill="currentColor" stroke="none">
+        <ellipse cx="7.4" cy="9.4" rx="1.9" ry="2.5" transform="rotate(-16 7.4 9.4)" />
+        <ellipse cx="12" cy="7.6" rx="1.9" ry="2.6" />
+        <ellipse cx="16.6" cy="9.4" rx="1.9" ry="2.5" transform="rotate(16 16.6 9.4)" />
+        <P d="M12 12.2c2.6 0 4.9 1.9 4.9 4.2 0 1.7-1.4 2.8-3.1 2.8-.9 0-1.2-.4-1.8-.4s-.9.4-1.8.4c-1.7 0-3.1-1.1-3.1-2.8 0-2.3 2.3-4.2 4.9-4.2Z" />
+      </g>
     </>
   ),
   flame: (
@@ -330,6 +337,19 @@ const GLYPHS: Record<IconName, JSX.Element> = {
       <P d="M8.2 9.6 6 3.4h4l2 4.6" />
       <P d="M15.8 9.6 18 3.4h-4l-2 4.6" />
       <P d="m12 12.4.9 1.9 2.1.3-1.5 1.4.4 2-1.9-1-1.9 1 .4-2-1.5-1.4 2.1-.3.9-1.9Z" />
+    </>
+  ),
+  pawMedal: (
+    <>
+      <P d="M8 3.5h3.5l.7 6.6-2.9 1.5-3.5-3.3L8 3.5Z" />
+      <P d="M16 3.5h-3.5l-.7 6.6 2.9 1.5 3.5-3.3L16 3.5Z" />
+      <circle cx="12" cy="15.5" r="5.5" fill="currentColor" fillOpacity="0.12" />
+      <g transform="translate(6 9) scale(0.5)" fill="currentColor" stroke="none">
+        <ellipse cx="7.4" cy="9.4" rx="1.9" ry="2.5" transform="rotate(-16 7.4 9.4)" />
+        <ellipse cx="12" cy="7.6" rx="1.9" ry="2.6" />
+        <ellipse cx="16.6" cy="9.4" rx="1.9" ry="2.5" transform="rotate(16 16.6 9.4)" />
+        <P d="M12 12.2c2.6 0 4.9 1.9 4.9 4.2 0 1.7-1.4 2.8-3.1 2.8-.9 0-1.2-.4-1.8-.4s-.9.4-1.8.4c-1.7 0-3.1-1.1-3.1-2.8 0-2.3 2.3-4.2 4.9-4.2Z" />
+      </g>
     </>
   ),
   compass: (

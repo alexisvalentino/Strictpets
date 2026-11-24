@@ -4,6 +4,7 @@ import Icon from './Icon';
 import Mascot from './Mascot';
 import {
   PET_SCENE_CATALOG,
+  PET_SCENE_SHOP_CATALOG,
   featuredPetScenes,
   type AccessoryId,
   type MascotId,
@@ -128,10 +129,19 @@ const PetSceneShop = ({
   onEquip,
 }: PetSceneShopProps) => {
   const [showAll, setShowAll] = useState(false);
-  const paidScenes = PET_SCENE_CATALOG.filter(scene => scene.price > 0);
+  const paidScenes = PET_SCENE_SHOP_CATALOG.filter(scene => scene.price > 0);
   const featuredIds = new Set(featuredPetScenes().map(scene => scene.id));
-  const scenes = showAll ? PET_SCENE_CATALOG : featuredPetScenes();
   const owned = new Set(ownedPetScenes);
+  const shopSceneIds = new Set(PET_SCENE_SHOP_CATALOG.map(scene => scene.id));
+  const archivedOwnedScenes = PET_SCENE_CATALOG.filter(
+    scene => scene.price > 0 && owned.has(scene.id) && !shopSceneIds.has(scene.id),
+  );
+  const scenes = showAll
+    ? [...PET_SCENE_SHOP_CATALOG, ...archivedOwnedScenes]
+    : [
+        ...featuredPetScenes(),
+        ...archivedOwnedScenes.filter(scene => scene.id === equippedPetScene),
+      ];
   const paidOwnedCount = paidScenes.filter(scene => owned.has(scene.id)).length;
 
   return (
@@ -167,7 +177,7 @@ const PetSceneShop = ({
         type="button"
         onClick={() => setShowAll(value => !value)}
         aria-expanded={showAll}
-        className="pet-scene-toggle mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200/80 bg-white px-3 text-xs font-bold text-slate-600 transition-[background-color,color,transform] hover:bg-white active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 motion-reduce:transition-none"
+        className="shop-outline-button mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200/80 bg-white px-3 text-xs font-bold text-slate-600 transition-[background-color,color,transform] hover:bg-white active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 motion-reduce:transition-none"
       >
         <Icon name={showAll ? 'chevronDown' : 'chevronRight'} size={13} />
         {showAll ? 'Show weekly picks' : `Browse all ${paidScenes.length}`}

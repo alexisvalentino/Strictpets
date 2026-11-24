@@ -31,7 +31,7 @@ Focus Tracker makes putting your phone down part of the focus session. Choose a 
 - **Twenty-two pets:** Start with the cat and meet new friends through focused minutes, completed sessions, and streak milestones.
 - **Coins and rewards:** Earn coins from completed sessions, with a weekend bonus. Reach the daily focus goal, collect the daily gift, and claim streak check-ins.
 - **Streak protection:** Add one shield before a missed day or repair an eligible streak afterward.
-- **Personalization:** Equip accessories, choose from 30 pet scenes, unlock color themes, and use System, Light, or Dark appearance.
+- **Personalization:** Equip accessories, browse 12 curated pet scenes, unlock color themes, and use System, Light, or Dark appearance.
 - **Progress:** Review the last seven days of focus, achievements, pet unlock goals, and session history.
 - **Native touches:** Best-effort haptics, optional evening streak reminders, and status-bar styling on supported devices.
 

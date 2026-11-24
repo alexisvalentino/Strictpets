@@ -1011,8 +1011,8 @@ console.log('== 32. Coin economy audit: permanent cosmetics last beyond the firs
   let s = base();
   let firstCatalogDay = null;
   const coreCatalogue = gs.ACCESSORY_CATALOG.reduce((n, a) => n + a.price, 0) + gs.THEME_CATALOG.reduce((n, t) => n + t.price, 0);
-  const sceneCatalogue = gs.PET_SCENE_CATALOG.reduce((n, scene) => n + scene.price, 0);
-  const featuredSceneCatalogue = gs.PET_SCENE_CATALOG.reduce((n, scene) => n + (scene.price > 0 ? Math.round(scene.price * 0.75) : 0), 0);
+  const sceneCatalogue = gs.PET_SCENE_SHOP_CATALOG.reduce((n, scene) => n + scene.price, 0);
+  const featuredSceneCatalogue = gs.PET_SCENE_SHOP_CATALOG.reduce((n, scene) => n + (scene.price > 0 ? Math.round(scene.price * 0.75) : 0), 0);
   const catalogue = coreCatalogue + sceneCatalogue;
   const bestPriceCatalogue = coreCatalogue + featuredSceneCatalogue;
   for (let d = 1; d <= 30; d++) {
@@ -1025,9 +1025,9 @@ console.log('== 32. Coin economy audit: permanent cosmetics last beyond the firs
     if (firstCatalogDay === null && s.coins >= coreCatalogue) firstCatalogDay = d;
   }
   ok(coreCatalogue === 3880, `all accessories and themes cost ${coreCatalogue} coins`);
-  ok(sceneCatalogue === 30 * gs.PET_SCENE_PRICE, `30 pet scenes cost ${sceneCatalogue} coins`);
-  ok(featuredSceneCatalogue === 30 * Math.round(gs.PET_SCENE_PRICE * 0.75), `buying every scene on feature costs ${featuredSceneCatalogue} coins`);
-  ok(catalogue === 30880, `all permanent cosmetics cost ${catalogue} coins`);
+  ok(sceneCatalogue === 12 * gs.PET_SCENE_PRICE, `12 curated pet scenes cost ${sceneCatalogue} coins`);
+  ok(featuredSceneCatalogue === 12 * Math.round(gs.PET_SCENE_PRICE * 0.75), `all curated scenes cost ${featuredSceneCatalogue} coins at featured prices`);
+  ok(catalogue === 14680, `all available permanent cosmetics cost ${catalogue} coins`);
   ok(firstCatalogDay === 12, `full daily payouts make core cosmetics affordable by day ${firstCatalogDay}`);
   ok(s.coins > coreCatalogue, `30 days of full daily payouts leave ${s.coins} coins after core cosmetics (${coreCatalogue})`);
   ok(s.coins >= coreCatalogue + gs.PET_SCENE_PRICE * 8, 'a steady month can still buy eight scenes after the starter collection');
@@ -1058,7 +1058,9 @@ console.log('== 32. Coin economy audit: permanent cosmetics last beyond the firs
 console.log('== 33. Pet scene shop rotates safely and keeps purchases ==');
 {
   const catalog = gs.PET_SCENE_CATALOG ?? [];
-  ok(catalog.length === 31, `scene catalog has a free starter and 30 permanent scenes (${catalog.length})`);
+  ok(catalog.length === 31, `scene catalog preserves the free starter and 30 historical scene IDs (${catalog.length})`);
+  const shopCatalog = gs.PET_SCENE_SHOP_CATALOG ?? [];
+  ok(shopCatalog.length === 13, `the current shop offers a starter and 12 curated scenes (${shopCatalog.length})`);
   ok(base().ownedPetScenes?.join(',') === 'classic', 'new players own the classic scene');
   ok(base().equippedPetScene === 'classic', 'classic scene is equipped by default');
 
@@ -1079,11 +1081,11 @@ console.log('== 33. Pet scene shop rotates safely and keeps purchases ==');
     for (let week = 0; week < 10; week++) {
       for (const item of offersFor(monday(week))) cycle.add(item.id);
     }
-    ok(cycle.size === 30, 'all 30 paid scenes return within the rotation');
+    ok(cycle.size === 12, 'all 12 curated paid scenes return within the rotation');
 
     const offer = firstWeek[0];
     const featuredPrice = gs.petScenePrice(offer.id, monday(0));
-    const regular = catalog.find(item => item.price > 0 && !firstWeek.some(featured => featured.id === item.id));
+    const regular = shopCatalog.find(item => item.price > 0 && !firstWeek.some(featured => featured.id === item.id));
     ok(offer && gs.petScenePrice(offer.id, monday(0)) === Math.round(gs.PET_SCENE_PRICE * 0.75), 'featured scenes receive a 25% discount');
     ok(regular && gs.petScenePrice(regular.id, monday(0)) === gs.PET_SCENE_PRICE, 'every scene remains available at its regular price');
     const poor = gs.buyPetScene?.({ ...base(), coins: featuredPrice - 1 }, offer.id, monday(0));
@@ -1101,14 +1103,14 @@ console.log('== 33. Pet scene shop rotates safely and keeps purchases ==');
     const boughtRegular = regular && gs.buyPetScene?.({ ...base(), coins: gs.PET_SCENE_PRICE }, regular.id, monday(0));
     ok(boughtRegular?.ok && boughtRegular.cost === gs.PET_SCENE_PRICE, 'a non-featured scene can be bought at its full price');
 
-    const allSceneCost = catalog.reduce((sum, scene) => sum + gs.petScenePrice(scene.id, monday(0)), 0);
+    const allSceneCost = shopCatalog.reduce((sum, scene) => sum + gs.petScenePrice(scene.id, monday(0)), 0);
     let fullCollection = { ...base(), coins: allSceneCost };
-    for (const scene of catalog.filter(item => item.price > 0)) {
+    for (const scene of shopCatalog.filter(item => item.price > 0)) {
       fullCollection = gs.buyPetScene(fullCollection, scene.id, monday(0)).state;
     }
     ok(fullCollection.coins === 0, 'the complete scene collection charges the exact purchase total');
-    ok(fullCollection.ownedPetScenes.length === catalog.length, 'all scenes can be collected and retained');
-    ok(fullCollection.equippedPetScene === catalog[catalog.length - 1].id, 'the last purchase becomes the active scene');
+    ok(fullCollection.ownedPetScenes.length === shopCatalog.length, 'all currently offered scenes can be collected and retained');
+    ok(fullCollection.equippedPetScene === shopCatalog[shopCatalog.length - 1].id, 'the last purchase becomes the active scene');
   }
 
   const oldStorage = global.localStorage;

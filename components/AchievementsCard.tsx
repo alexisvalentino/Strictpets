@@ -47,7 +47,7 @@ const AchievementsCard = (stats: AchievementsCardProps) => {
             className="flex min-h-12 w-full items-center gap-3 text-left"
           >
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-50 text-brand-700 ring-1 ring-sky-100">
-              <Icon name="medal" size={18} />
+              <Icon name="pawMedal" size={18} />
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-base font-bold tracking-tight text-slate-900">Achievements</span>

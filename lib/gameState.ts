@@ -59,10 +59,13 @@ export const RECORD_BONUS = 50; // coins for beating your longest session
 // --- Mascot accessories (cosmetics) ---
 export const ACCESSORY_CATALOG = [
   { id: 'flower', name: 'Flower', price: 60 },
+  { id: 'bell-collar', name: 'Bell Collar', price: 0 },
   { id: 'scarf', name: 'Cozy Scarf', price: 150 },
   { id: 'party-hat', name: 'Party Hat', price: 220 },
+  { id: 'moon-clip', name: 'Moon Clip', price: 0 },
   { id: 'halo', name: 'Star Halo', price: 300 },
   { id: 'sunglasses', name: 'Shades', price: 450 },
+  { id: 'heart-shades', name: 'Heart Shades', price: 0 },
   { id: 'crown', name: 'Crown', price: 900 },
 ] as const;
 
@@ -102,9 +105,9 @@ export const isThemeId = (id: string): id is ThemeId =>
   THEME_CATALOG.some(t => t.id === id);
 
 // --- Pet scenes (permanent cosmetic collection) ---
-// Thirty combinations create a longer runway for earned coins. Three unowned
-// scenes are featured each week; every scene returns, and purchases never
-// expire. The scene changes only the soft stage behind the pet artwork.
+// Keep all earlier scene IDs valid for existing saves, but offer a curated set
+// of twelve for new purchases. Three shop scenes feature each week; all
+// available scenes return, and purchases never expire.
 export const PET_SCENE_PRICE = 900;
 export const PET_SCENE_WEEKLY_OFFERS = 3;
 const PET_SCENE_ROTATION_START = '2026-01-05'; // Monday; fixed for stable saves
@@ -170,14 +173,28 @@ export const PET_SCENE_CATALOG: readonly PetSceneDefinition[] = [
   ),
 ];
 
+const PET_SCENE_SHOP_IDS: readonly PetSceneId[] = [
+  'clouds-sky', 'clouds-twilight', 'clouds-lavender',
+  'meadow-peach', 'meadow-mint',
+  'moon-twilight', 'moon-lavender', 'moon-rose',
+  'ocean-sky', 'ocean-mint',
+  'blossoms-peach', 'blossoms-rose',
+];
+
+// The full catalog remains the source of truth for saved ownership and
+// rendering. Only this curated catalog is available in the current shop.
+export const PET_SCENE_SHOP_CATALOG: readonly PetSceneDefinition[] = [
+  ...PET_SCENE_CATALOG.filter(scene => scene.id === 'classic'),
+  ...PET_SCENE_CATALOG.filter(scene => PET_SCENE_SHOP_IDS.includes(scene.id)),
+];
+
 export const isPetSceneId = (id: string): id is PetSceneId =>
   PET_SCENE_CATALOG.some(scene => scene.id === id);
 
-// Offers are pinned to the user's local Monday and a fixed epoch. Owned
-// scenes are skipped so a full wallet never gets stuck looking at purchases
-// already made. Items cycle back after ten weeks, with no expiry or FOMO.
+// Offers are pinned to the user's local Monday and a fixed epoch. The twelve
+// curated scenes cycle every four weeks, with no expiry or FOMO.
 export const featuredPetScenes = (now: Date = new Date()): PetSceneDefinition[] => {
-  const paid = PET_SCENE_CATALOG.filter(scene => scene.price > 0);
+  const paid = PET_SCENE_SHOP_CATALOG.filter(scene => scene.price > 0);
   const today = dateOrdinal(todayKey(now));
   const anchor = dateOrdinal(PET_SCENE_ROTATION_START);
   if (today === null || anchor === null || paid.length < PET_SCENE_WEEKLY_OFFERS) return [];
@@ -194,7 +211,7 @@ export const featuredPetScenes = (now: Date = new Date()): PetSceneDefinition[] 
 };
 
 export const petScenePrice = (id: PetSceneId, now: Date = new Date()): number => {
-  const item = PET_SCENE_CATALOG.find(scene => scene.id === id);
+  const item = PET_SCENE_SHOP_CATALOG.find(scene => scene.id === id);
   if (!item || item.price <= 0) return 0;
   return featuredPetScenes(now).some(scene => scene.id === id)
     ? Math.round(item.price * 0.75)
@@ -1294,7 +1311,7 @@ export const unlockedCount = (s: AchievementStats): number =>
 
 // --- Mascot shop ---
 
-// Buy an accessory with coins (auto-equips it).
+// Unlock an accessory with coins or for free (auto-equips it).
 export const buyAccessory = (
   prev: GameState,
   id: AccessoryId,
@@ -1401,7 +1418,7 @@ export const buyPetScene = (
   now: Date = new Date(),
 ): { state: GameState; ok: boolean; cost: number } => {
   const s = normalizeForToday(prev, now);
-  const item = PET_SCENE_CATALOG.find(scene => scene.id === id);
+  const item = PET_SCENE_SHOP_CATALOG.find(scene => scene.id === id);
   const cost = item ? petScenePrice(id, now) : 0;
   if (!item || item.price <= 0 || s.ownedPetScenes.includes(id) || s.coins < cost) {
     return { state: s, ok: false, cost };

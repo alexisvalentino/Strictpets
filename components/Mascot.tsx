@@ -469,7 +469,7 @@ const MOUTH_DY: Partial<Record<MascotId, number>> = {
   koala: 8,
 };
 
-// Cosmetic overlays are placed against the normalized transparent portraits.
+// Cosmetic overlays are placed against the normalized square portraits.
 // The same head and eye anchors are shared by the full catalog so a chosen
 // cosmetic follows the pet across every screen and mood.
 const ACCESSORIES: Record<AccessoryId, ReactNode> = {
@@ -483,18 +483,41 @@ const ACCESSORIES: Record<AccessoryId, ReactNode> = {
       <circle cx="86.5" cy="18" r="2.4" fill="#FDE047" />
     </g>
   ),
+  'bell-collar': (
+    <g>
+      <path
+        d="M40 78 Q60 85 80 78 L76 85 Q60 91 44 85 Z"
+        fill="#E9BC62"
+        stroke="#AD762B"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path d="M44 80 Q60 86 76 80" fill="none" stroke="#FFF1C7" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M54 88 Q60 84 66 88 L65 96 Q60 101 55 96 Z" fill="#FBBF24" stroke="#AD762B" strokeWidth="1.6" strokeLinejoin="round" />
+      <circle cx="60" cy="91" r="1.8" fill="#FFF1C7" />
+    </g>
+  ),
   scarf: (
     <g>
       <path
-        d="M39 76 Q60 84 81 76 L77 86 Q60 93 43 86 Z"
-        fill="#38BDF8"
-        stroke="#0284C7"
+        d="M39 74 Q60 82 81 74 L77 83 Q60 90 43 83 Z"
+        fill="#C66A52"
+        stroke="#93483B"
         strokeWidth="2"
         strokeLinejoin="round"
       />
-      <path d="M48 80 Q60 85 72 80" fill="none" stroke="#E0F2FE" strokeWidth="2" strokeLinecap="round" />
-      <path d="M52 87 L60 99 L68 87 Z" fill="#0EA5E9" stroke="#0284C7" strokeWidth="1.5" strokeLinejoin="round" />
-      <path d="M58 90 L60 95 L62 90" fill="none" stroke="#BAE6FD" strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M45 77 Q60 83 75 77" fill="none" stroke="#FCE2C7" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M47 81 l3 3m5-1 3 3m5-1 3 3" fill="none" stroke="#E9A88A" strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M68 82 Q76 78 81 84 Q77 89 69 88 Q66 85 68 82 Z" fill="#E7A184" stroke="#93483B" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M73 87 L81 89 L77 100 L69 96 Z" fill="#B85843" stroke="#93483B" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M69.5 95.5 77.5 97.5M68.5 98.5 76.5 100.5" fill="none" stroke="#FCE2C7" strokeWidth="1.2" strokeLinecap="round" />
+    </g>
+  ),
+  'moon-clip': (
+    <g transform="translate(68 12) scale(0.8)">
+      <path d="M23 5 C15 5 10 11 10 18 S15 31 23 31 C17 28 15 22 16 17 C17 12 20 8 23 5 Z" fill="#8B78C8" stroke="#6554A0" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M21 9 Q15 14 16 21" fill="none" stroke="#DCD5FF" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M30 5 31.5 8.5 35 10 31.5 11.5 30 15 28.5 11.5 25 10 28.5 8.5 Z" fill="#FBBF24" />
     </g>
   ),
   'party-hat': (
@@ -529,6 +552,15 @@ const ACCESSORIES: Record<AccessoryId, ReactNode> = {
       <path d="M84 57 L94 55" stroke="#1E293B" strokeWidth="3" strokeLinecap="round" />
     </g>
   ),
+  'heart-shades': (
+    <g>
+      <path d="M45 68 C42 65 35 61 35 56 C35 50 42 49 46 55 C50 49 57 50 57 56 C57 61 50 65 45 68 Z" fill="#E65D76" stroke="#9F304B" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M75 68 C72 65 65 61 65 56 C65 50 72 49 76 55 C80 49 87 50 87 56 C87 61 80 65 75 68 Z" fill="#E65D76" stroke="#9F304B" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M57 58 Q60 56 63 58" fill="none" stroke="#9F304B" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M44 53 Q47 52 48 55 M74 53 Q77 52 78 55" fill="none" stroke="#FFE9EC" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M35 57 26 55 M85 57 94 55" fill="none" stroke="#9F304B" strokeWidth="2.8" strokeLinecap="round" />
+    </g>
+  ),
   crown: (
     <g transform="translate(0 7)">
       <path
@@ -541,6 +573,18 @@ const ACCESSORIES: Record<AccessoryId, ReactNode> = {
       <circle cx="60" cy="29" r="3" fill="#38BDF8" />
     </g>
   ),
+};
+
+// A few portraits need their accessories nudged to follow their distinctive
+// facial landmarks. All other pets use the shared normalized anchors above.
+const ACCESSORY_TRANSFORMS: Partial<Record<MascotId, Partial<Record<AccessoryId, string>>>> = {
+  frog: {
+    sunglasses: 'translate(0 -10)',
+    'heart-shades': 'translate(0 -10)',
+  },
+  unicorn: {
+    'party-hat': 'translate(18 4) scale(0.78)',
+  },
 };
 
 const Mascot = ({
@@ -576,6 +620,7 @@ const Mascot = ({
         : mood === 'running'
           ? 'mascot-bob'
           : 'mascot-breathe';
+  const accessoryTransform = accessory ? ACCESSORY_TRANSFORMS[variant]?.[accessory] : undefined;
 
   return (
     <div className={`relative ${className ?? ''}`}>
@@ -719,7 +764,11 @@ const Mascot = ({
         {sad && !imageFailed && <span className="mascot-portrait-tear mascot-portrait-tear-right" />}
         {accessory && (
           <svg viewBox="0 0 120 120" className="pointer-events-none absolute inset-0 h-full w-full overflow-visible" aria-hidden="true">
-            {ACCESSORIES[accessory]}
+            {accessoryTransform ? (
+              <g transform={accessoryTransform}>{ACCESSORIES[accessory]}</g>
+            ) : (
+              ACCESSORIES[accessory]
+            )}
           </svg>
         )}
       </div>
