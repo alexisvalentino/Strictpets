@@ -53,7 +53,7 @@ const HomePage = ({
   const goalPct = Math.min(100, (minutesToday / DAILY_GOAL) * 100);
   return (
     <div className="flex h-full w-full shrink-0 snap-start flex-col overflow-y-auto">
-      <main className="mx-auto w-full max-w-md px-4 py-6 pl-[max(1rem,var(--safe-area-left))] pr-[max(1rem,var(--safe-area-right))] sm:px-6 md:max-w-4xl">
+      <main className="mx-auto w-full max-w-md px-4 pt-[max(1.5rem,var(--safe-area-top))] pb-6 pl-[max(1rem,var(--safe-area-left))] pr-[max(1rem,var(--safe-area-right))] sm:px-6 md:max-w-4xl">
         <header className="mb-5">
           <h1 className="text-[26px] font-black leading-tight tracking-tight text-slate-900">
             This week

@@ -145,7 +145,7 @@ const RewardsPage = ({
         .rw-pop { animation: rw-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
       `}</style>
 
-      <div className="my-auto mx-auto w-full max-w-md px-4 py-6 pl-[max(1rem,var(--safe-area-left))] pr-[max(1rem,var(--safe-area-right))] sm:px-6 md:max-w-3xl lg:max-w-4xl">
+      <div className="my-auto mx-auto w-full max-w-md px-4 pt-[max(1.5rem,var(--safe-area-top))] pb-[max(1.5rem,var(--safe-area-bottom))] pl-[max(1rem,var(--safe-area-left))] pr-[max(1rem,var(--safe-area-right))] sm:px-6 md:max-w-3xl lg:max-w-4xl">
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-2xl font-black tracking-tight text-slate-900">
             Rewards

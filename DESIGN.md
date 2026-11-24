@@ -162,8 +162,11 @@ secondary to the action and its status.
 
 ## Layout
 
-The app keeps three horizontally swipeable destinations—Home, Focus, and
-Rewards—with a centered bottom tab bar. Focus is the main task surface. Its
+The app keeps three swipeable destinations—Home, Focus, and Rewards. Compact
+windows use a centered bottom tab bar; expanded windows move the same
+destinations into a labeled left navigation rail. On foldable browsers that
+expose separate viewport segments, navigation stays in one pane and the active
+destination stays clear of the hinge. Focus is the main task surface. Its
 header uses a target glyph as a focus marker; it is not an ordinal step. Home
 shows the current streak and today's progress, then the pet and next waypoint.
 Rewards separates Claim from Collect so claimable progress stays distinct from
@@ -172,8 +175,11 @@ the pet, accessory, and theme collections.
 Phone content is centered in a narrow column. Wider screens expand to a
 balanced two-column composition, with claim strips kept wide enough for their
 touch targets. The shell follows the visible viewport (`100dvh`, with a `vh`
-fallback); page wrappers and the tab bar respect iOS and Android safe-area
-insets. Narrow check-in rows wrap to preserve a 44px minimum target.
+fallback); page wrappers and navigation respect iOS and Android safe-area
+insets. Narrow check-in rows wrap to preserve a 44px minimum target. Tablet
+layouts use available width for two-column Home and Rewards content while
+keeping Focus centered at a readable measure. Compact split-screen windows
+keep the phone navigation layout based on their actual viewport width.
 
 ## Elevation & Depth
 
@@ -225,10 +231,10 @@ reachable on narrow phones, alongside a 44px Set control.
 
 ### Navigation
 
-The bottom bar is a translucent white surface with three centered, 44px-minimum
-targets. The active tab uses a cobalt icon and a pale-blue capsule; the reward
-dot appears only when something is claimable. During an active focus session,
-navigation remains disabled.
+Compact windows use a translucent bottom bar with three 44px-minimum targets;
+expanded windows use a labeled rail. The active destination uses a cobalt icon
+and a pale-blue capsule; the reward dot appears only when something is
+claimable. During an active focus session, navigation remains disabled.
 
 ### Waypoint
 

@@ -193,11 +193,99 @@ const hapticCollect = () => {
   void Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
 };
 
+const FocusSessionTimer = ({
+  duration,
+  startedAt,
+  onComplete,
+}: {
+  duration: number;
+  startedAt: number;
+  onComplete: () => void;
+}) => {
+  const [elapsed, setElapsed] = useState(0);
+  const progress = Math.min(100, (elapsed / duration) * 100);
+
+  useEffect(() => {
+    let completed = false;
+    let lastElapsed = -1;
+    const tick = () => {
+      if (completed) return;
+      const seconds = Math.floor((performance.now() - startedAt) / 1000);
+      const nextElapsed = Math.min(seconds, duration);
+      if (nextElapsed !== lastElapsed) {
+        lastElapsed = nextElapsed;
+        setElapsed(nextElapsed);
+      }
+      if (seconds >= duration) {
+        completed = true;
+        onComplete();
+      }
+    };
+
+    tick();
+    const id = window.setInterval(tick, 200);
+    return () => window.clearInterval(id);
+  }, [duration, onComplete, startedAt]);
+
+  return (
+    <div
+      role="progressbar"
+      aria-label="Focus session progress"
+      aria-valuemin={0}
+      aria-valuemax={duration}
+      aria-valuenow={elapsed}
+      aria-valuetext={`${formatTime(elapsed)} elapsed of ${formatTime(duration)}`}
+      className="guide-timer-orbit relative mx-auto h-64 w-64"
+    >
+      <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
+        <defs>
+          <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style={{ stopColor: 'rgb(var(--sky-400, 56 189 248))' }} />
+            <stop offset="100%" style={{ stopColor: 'rgb(var(--brand-600, 23 102 243))' }} />
+          </linearGradient>
+        </defs>
+        <circle
+          cx="60"
+          cy="60"
+          r="52"
+          fill="none"
+          stroke="rgb(var(--sky-100, 224 242 254))"
+          strokeWidth="9"
+        />
+        <circle
+          cx="60"
+          cy="60"
+          r="52"
+          fill="none"
+          stroke="url(#ringGrad)"
+          strokeWidth="9"
+          strokeLinecap="round"
+          style={{
+            strokeDasharray: 2 * Math.PI * 52,
+            strokeDashoffset: 2 * Math.PI * 52 * (1 - progress / 100),
+            transition: 'stroke-dashoffset 0.2s linear',
+          }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <p className="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-brand-600">
+          Focus time
+        </p>
+        <div className="text-5xl font-black tabular-nums tracking-tight text-slate-900">
+          {formatTime(elapsed)}
+        </div>
+        <div className="mt-1 text-xs font-semibold uppercase tracking-widest text-slate-500">
+          goal {formatTime(duration)}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const FocusTracker = () => {
   const [phase, setPhase] = useState<Phase>('idle');
   const [failReason, setFailReason] = useState<FailReason>('touch');
   const [duration, setDuration] = useState(60);
-  const [elapsed, setElapsed] = useState(0);
   const [customOpen, setCustomOpen] = useState(false);
   const [customMin, setCustomMin] = useState('');
   const [customSec, setCustomSec] = useState('');
@@ -267,6 +355,62 @@ const FocusTracker = () => {
     const key = TAB_KEYS[Math.max(0, Math.min(TAB_KEYS.length - 1, idx))];
     if (key !== activeTab) setActiveTab(key);
   };
+
+  // The Viewport Segments API identifies a fold or hinge when the browser
+  // exposes one. Drive layout from its live rectangles, with normal responsive
+  // layout as the fallback on browsers that do not expose viewport segments.
+  useLayoutEffect(() => {
+    type SegmentWindow = Window & {
+      viewport?: {
+        segments?: Array<{ left: number; top: number; width: number; height: number }>;
+      };
+    };
+
+    const root = document.documentElement;
+    const clearFoldLayout = () => {
+      delete root.dataset.foldMode;
+      root.style.removeProperty('--fold-first-size');
+      root.style.removeProperty('--fold-hinge-size');
+      root.style.removeProperty('--fold-second-size');
+    };
+    const syncFoldLayout = () => {
+      const segments = (window as SegmentWindow).viewport?.segments ?? [];
+      if (segments.length !== 2) {
+        clearFoldLayout();
+        return;
+      }
+
+      const [first, second] = segments;
+      if (Math.abs(first.top - second.top) < 1 && second.left > first.left) {
+        root.dataset.foldMode = 'book';
+        root.style.setProperty('--fold-first-size', `${first.width}px`);
+        root.style.setProperty(
+          '--fold-hinge-size',
+          `${Math.max(0, second.left - (first.left + first.width))}px`,
+        );
+        root.style.setProperty('--fold-second-size', `${second.width}px`);
+      } else if (Math.abs(first.left - second.left) < 1 && second.top > first.top) {
+        root.dataset.foldMode = 'tabletop';
+        root.style.setProperty('--fold-first-size', `${first.height}px`);
+        root.style.setProperty(
+          '--fold-hinge-size',
+          `${Math.max(0, second.top - (first.top + first.height))}px`,
+        );
+        root.style.setProperty('--fold-second-size', `${second.height}px`);
+      } else {
+        clearFoldLayout();
+      }
+    };
+
+    syncFoldLayout();
+    window.addEventListener('resize', syncFoldLayout);
+    window.visualViewport?.addEventListener('resize', syncFoldLayout);
+    return () => {
+      window.removeEventListener('resize', syncFoldLayout);
+      window.visualViewport?.removeEventListener('resize', syncFoldLayout);
+      clearFoldLayout();
+    };
+  }, []);
 
   // Refs so the mount-once listeners always see the latest state.
   const phaseRef = useRef<Phase>('idle');
@@ -362,7 +506,6 @@ const FocusTracker = () => {
       setFailedStreak(failed.lostStreak);
       setFailResult({ seconds, reward });
       setFailReason(reason);
-      setElapsed(0);
       setPhase('failed');
       // A swipe/tab tap during a session fails it — bring the user back to the
       // tracker so they actually see the failure.
@@ -501,47 +644,27 @@ const FocusTracker = () => {
     }
   }, []);
 
-  // Count-up timer while a session is running.
-  useEffect(() => {
-    if (phase !== 'running') return;
-    const id = window.setInterval(() => {
-      // A failure closes phaseRef synchronously; a queued tick must not award
-      // a completed session before React cleans up this interval.
-      if (phaseRef.current !== 'running') return;
-      const t = Math.floor(
-        (performance.now() - sessionStartMonotonicRef.current) / 1000,
-      );
-      if (t >= duration) {
-        setElapsed(duration);
-        // Guard against a stray extra tick before the interval is torn down.
-        if (!successHandledRef.current) {
-          successHandledRef.current = true;
-          phaseRef.current = 'done';
-          clearSessionRunning();
-          playSuccessSound();
-          hapticSuccess();
-          const { state, result } = recordSession(gameRef.current, duration);
-          update(() => state);
-          setLastCoinsEarned(result.coinsEarned);
-          setLastFreezeUsed(result.freezeUsed);
-          setLastWeekendBonus(result.weekendBonus);
-          setLastNewRecord(result.newRecord);
-          setLastNewPets(result.newPets);
-          // Big milestones get the fanfare + stronger haptic on top.
-          if (result.newRecord || result.newPets.length > 0) {
-            playCelebrationSound();
-            hapticCelebration();
-          }
-          // A finished session is the natural moment to offer reminders.
-          void requestReminderPermission().then(() => setReminderNonce(n => n + 1));
-        }
-        setPhase('done');
-      } else {
-        setElapsed(t);
-      }
-    }, 200);
-    return () => window.clearInterval(id);
-  }, [phase, duration, gameRef, update]);
+  const completeSession = useCallback(() => {
+    if (phaseRef.current !== 'running' || successHandledRef.current) return;
+    successHandledRef.current = true;
+    phaseRef.current = 'done';
+    clearSessionRunning();
+    playSuccessSound();
+    hapticSuccess();
+    const { state, result } = recordSession(gameRef.current, duration);
+    update(() => state);
+    setLastCoinsEarned(result.coinsEarned);
+    setLastFreezeUsed(result.freezeUsed);
+    setLastWeekendBonus(result.weekendBonus);
+    setLastNewRecord(result.newRecord);
+    setLastNewPets(result.newPets);
+    if (result.newRecord || result.newPets.length > 0) {
+      playCelebrationSound();
+      hapticCelebration();
+    }
+    void requestReminderPermission().then(() => setReminderNonce(n => n + 1));
+    setPhase('done');
+  }, [duration, gameRef, update]);
 
   // Custom duration: clamp to 10s – 4h, then keep the previous goal if invalid.
   const applyCustom = () => {
@@ -559,7 +682,6 @@ const FocusTracker = () => {
 
   const start = () => {
     markSessionRunning();
-    setElapsed(0);
     setFailResult(null);
     setFailedStreak(false);
     lastTouchHandledAtRef.current = 0;
@@ -575,7 +697,6 @@ const FocusTracker = () => {
   };
 
   const reset = () => {
-    setElapsed(0);
     phaseRef.current = 'idle';
     setPhase('idle');
   };
@@ -718,7 +839,6 @@ const FocusTracker = () => {
     nativeSelectionHaptic();
   };
 
-  const progress = Math.min(100, (elapsed / duration) * 100);
   // Engine rule — the card, the completion message, the badge, and the payout
   // all read the same helper, so they cannot disagree.
   const goal = dailyGoalStatus(game);
@@ -743,7 +863,7 @@ const FocusTracker = () => {
     >
       <div
         data-theme={game.activeTheme}
-        className="guide-app relative flex h-full w-full flex-col bg-gradient-to-b from-sky-100 via-sky-50 to-white"
+        className="guide-app relative flex h-full w-full flex-col bg-gradient-to-b from-sky-100 via-sky-50 to-white md:flex-row"
       >
         {/* reward toast (floats above whatever page is visible) */}
         {popText && (
@@ -824,7 +944,7 @@ const FocusTracker = () => {
         <div
           ref={carouselRef}
           onScroll={onCarouselScroll}
-          className={`no-scrollbar flex flex-1 snap-x snap-mandatory md:snap-none ${
+          className={`guide-carousel no-scrollbar flex flex-1 snap-x snap-mandatory md:order-last md:min-w-0 md:snap-none ${
             phase === 'idle' ? 'overflow-x-auto' : 'overflow-x-hidden'
           }`}
         >
@@ -856,7 +976,7 @@ const FocusTracker = () => {
 
           {/* Focus page — the tracker, the priority */}
           <div className="flex h-full w-full shrink-0 snap-start flex-col overflow-y-auto">
-            <div className="my-auto mx-auto w-full max-w-md px-4 py-6 pl-[max(1rem,var(--safe-area-left))] pr-[max(1rem,var(--safe-area-right))] sm:px-6 md:max-w-lg lg:max-w-2xl">
+            <div className="my-auto mx-auto w-full max-w-md px-4 pt-[max(1.5rem,var(--safe-area-top))] pb-[max(1.5rem,var(--safe-area-bottom))] pl-[max(1rem,var(--safe-area-left))] pr-[max(1rem,var(--safe-area-right))] sm:px-6 md:max-w-lg lg:max-w-2xl">
               {phase === 'idle' && (
                 <div className="focus-state-enter">
                   <header className="mb-3 flex items-center justify-between gap-2.5">
@@ -1009,59 +1129,11 @@ const FocusTracker = () => {
 
               {phase === 'running' && (
                 <div className="guide-state-panel focus-state-enter text-center">
-                  {/* circular gradient progress ring */}
-                  <div
-                    role="progressbar"
-                    aria-label="Focus session progress"
-                    aria-valuemin={0}
-                    aria-valuemax={duration}
-                    aria-valuenow={elapsed}
-                    aria-valuetext={`${formatTime(elapsed)} elapsed of ${formatTime(duration)}`}
-                    className="guide-timer-orbit relative mx-auto h-64 w-64"
-                  >
-                    <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
-                      <defs>
-                        <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" style={{ stopColor: 'rgb(var(--sky-400, 56 189 248))' }} />
-                          <stop offset="100%" style={{ stopColor: 'rgb(var(--brand-600, 23 102 243))' }} />
-                        </linearGradient>
-                      </defs>
-                      <circle
-                        cx="60"
-                        cy="60"
-                        r="52"
-                        fill="none"
-                        stroke="rgb(var(--sky-100, 224 242 254))"
-                        strokeWidth="9"
-                      />
-                      <circle
-                        cx="60"
-                        cy="60"
-                        r="52"
-                        fill="none"
-                        stroke="url(#ringGrad)"
-                        strokeWidth="9"
-                        strokeLinecap="round"
-                        style={{
-                          strokeDasharray: 2 * Math.PI * 52,
-                          strokeDashoffset:
-                            2 * Math.PI * 52 * (1 - progress / 100),
-                          transition: 'stroke-dashoffset 0.2s linear',
-                        }}
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <p className="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-brand-600">
-                        Focus time
-                      </p>
-                      <div className="text-5xl font-black tabular-nums tracking-tight text-slate-900">
-                        {formatTime(elapsed)}
-                      </div>
-                      <div className="mt-1 text-xs font-semibold uppercase tracking-widest text-slate-500">
-                        goal {formatTime(duration)}
-                      </div>
-                    </div>
-                  </div>
+                  <FocusSessionTimer
+                    duration={duration}
+                    startedAt={sessionStartMonotonicRef.current}
+                    onComplete={completeSession}
+                  />
 
                   <Mascot
                     mood="running"
