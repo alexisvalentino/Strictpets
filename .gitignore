@@ -1,113 +1,101 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# See https://git-scm.com/docs/gitignore for details.
 
-# dependencies
-node_modules/
+# Node.js dependencies and generated web output
+/node_modules/
 /.pnp
-.pnp.js
+/.pnp.js
+/.next/
+/out/
+/coverage/
 
-# testing
-coverage/
-/.tmp-gs
-/.tmp-gallery
+# Local visual-test scratch output
+/.tmp-gs/
+/.tmp-gallery/
 
-# local build caches (keep Gradle wrapper files tracked)
+# Local Gradle cache
 /.gradle/
 
-# next.js
-.next/
-out/
-dist/
-
-# android build output and packaged artifacts
+# Android machine-specific SDK path, build output, and packaged artifacts
+/android/local.properties
 /android/.gradle/
 /android/build/
 /android/app/build/
 /android/capacitor-cordova-android-plugins/build/
-android/local.properties
-android/app/src/main/assets/public/
-android/app/src/main/assets/capacitor.config.json
+/android/app/src/main/assets/public/
+/android/app/src/main/assets/capacitor.config.json
 *.apk
 *.aab
 
-# production
-build/
-.vercel/
+# iOS generated Xcode state and synced web assets
+/ios/App/Pods/
+/ios/App/build/
+/ios/App/DerivedData/
+/ios/App/App/public/
+/ios/App/App/capacitor.config.json
+**/xcuserdata/
+*.xcuserstate
 
-# misc
-.DS_Store
-Thumbs.db
-
-# debug
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-tsconfig.tsbuildinfo
-
-# environment and secrets
+# Environment files: commit templates with placeholder values only
 .env
 .env.*
 !.env.example
 !.env.*.example
+
+# Credential and private-key material
 .secret
 .secrets
 *.secret
 *.secrets
 *.credentials
 *.credentials.json
-/secret/
-/secrets/
-/credentials/
-/secret.json
-/secrets.json
-/credentials.json
-key.properties
-keystore.properties
-*.keystore
-*.jks
+*.key
 *.pem
 *.p12
 *.pfx
 *.p8
-*.cer
+*.jks
+*.keystore
+key.properties
+keystore.properties
+
+# Common credential filenames (wherever they occur)
+secret.json
+secrets.json
+credentials.json
+
+# Common root-level local credential stores
+/secret/
+/secrets/
+/credentials/
+
+# iOS signing profiles
 *.mobileprovision
 *.provisionprofile
 
-# local conversation exports (Codex chat history is stored outside this repo)
+# OS metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Package-manager debug logs and TypeScript build cache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+tsconfig.tsbuildinfo
+
+# Local downloaded image-processing packages and model weights
+/tmp/rembg/
+/tmp/u2net/
+
+# Local conversation exports (Codex chat history is stored outside this repo)
 /chat-history/
 /conversation-history/
 /conversations/
-*.chatlog
-*.conversation.json
 
-# IDE
-.idea/
-*.iml
-.vscode/
-
-# local agent tooling
-.agents/
-.codex/
-.freebuff/
-.skills/
-.clinerules/
-.impeccable/
-stitch_ging_qr_alarm_app/
-
-# generated design studies, model downloads, and unrelated local notes
-output/
-tmp/
-gingdesignmd.md
-
-# image-generation sidecar metadata is not used at runtime
+# Image-generation sidecar metadata is not used at runtime
 /public/icons/*.webp.json
 /public/pets/*.webp.json
 
-# iOS signing material and build products
-ios/App/Pods/
-ios/App/build/
-ios/App/DerivedData/
-ios/App/App/public/
-ios/App/App/capacitor.config.json
-xcuserdata/
-*.xcuserstate
+# Vercel local project state
+/.vercel/
