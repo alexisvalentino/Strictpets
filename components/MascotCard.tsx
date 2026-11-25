@@ -34,7 +34,7 @@ const MascotCard = ({
     ? Math.min(100, Math.floor((progress.current / progress.target) * 100))
     : 100;
   return (
-    <section className="relative mt-4 w-full overflow-hidden rounded-[26px] border border-white/85 bg-white/55 p-3 text-left shadow-xl shadow-sky-700/10 backdrop-blur-md">
+    <section className="relative mt-4 w-full overflow-hidden rounded-[26px] border border-white/85 bg-white/55 p-3 text-left shadow-xl shadow-sky-700/10 backdrop-blur-sm">
       <div className="grid grid-cols-[minmax(0,1fr)_7.5rem] items-center gap-2">
         <div className="min-w-0 pl-1">
           <p className="text-[10px] font-black uppercase tracking-[0.14em] text-brand-600">Your companion</p>

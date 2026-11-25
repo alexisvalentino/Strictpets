@@ -206,25 +206,36 @@ const FocusSessionTimer = ({
   const progress = Math.min(100, (elapsed / duration) * 100);
 
   useEffect(() => {
-    let completed = false;
+    let finished = false;
+    let timeoutId: number | null = null;
     let lastElapsed = -1;
     const tick = () => {
-      if (completed) return;
-      const seconds = Math.floor((performance.now() - startedAt) / 1000);
+      if (finished) return;
+      const elapsedMs = Math.max(0, performance.now() - startedAt);
+      const seconds = Math.floor(elapsedMs / 1000);
       const nextElapsed = Math.min(seconds, duration);
       if (nextElapsed !== lastElapsed) {
         lastElapsed = nextElapsed;
         setElapsed(nextElapsed);
       }
-      if (seconds >= duration) {
-        completed = true;
+      const remainingMs = duration * 1000 - elapsedMs;
+      if (remainingMs <= 0) {
+        finished = true;
         onComplete();
+        return;
       }
+
+      // Run on the next visible second boundary (or the deadline), rather
+      // than waking the WebView five times per second to check the same clock.
+      const nextSecondMs = 1000 - (elapsedMs % 1000);
+      timeoutId = window.setTimeout(tick, Math.max(1, Math.min(nextSecondMs, remainingMs)));
     };
 
     tick();
-    const id = window.setInterval(tick, 200);
-    return () => window.clearInterval(id);
+    return () => {
+      finished = true;
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+    };
   }, [duration, onComplete, startedAt]);
 
   return (
@@ -263,7 +274,7 @@ const FocusSessionTimer = ({
           style={{
             strokeDasharray: 2 * Math.PI * 52,
             strokeDashoffset: 2 * Math.PI * 52 * (1 - progress / 100),
-            transition: 'stroke-dashoffset 0.2s linear',
+            transition: 'stroke-dashoffset 1s linear',
           }}
         />
       </svg>

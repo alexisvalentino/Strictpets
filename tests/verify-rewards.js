@@ -390,8 +390,13 @@ console.log('== 10. Mascot / accessory / theme shops ==');
     ok(removed.ok && removed.state.equippedAccessory === null, `${item.id} can be removed`);
     const worn = gs.equipAccessory(removed.state, item.id);
     ok(worn.ok && worn.state.equippedAccessory === item.id, `${item.id} can be re-equipped`);
-    const short = gs.buyAccessory({ ...base(), coins: Math.max(0, item.price - 1) }, item.id);
-    ok(!short.ok && !short.state.ownedAccessories.includes(item.id), `${item.id} stays locked when unaffordable`);
+    if (item.price === 0) {
+      const free = gs.buyAccessory({ ...base(), coins: 0 }, item.id);
+      ok(free.ok && free.cost === 0 && free.state.ownedAccessories.includes(item.id), `${item.id} remains free with zero coins`);
+    } else {
+      const short = gs.buyAccessory({ ...base(), coins: item.price - 1 }, item.id);
+      ok(!short.ok && !short.state.ownedAccessories.includes(item.id), `${item.id} stays locked when unaffordable`);
+    }
   }
 
   // Theme: buy + equip

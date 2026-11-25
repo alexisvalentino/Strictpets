@@ -104,13 +104,13 @@ const ART: Record<AccessoryId, JSX.Element> = {
     </>
   ),
   'heart-shades': (
-    <>
+    <g transform="translate(-10.32 -9.56) scale(0.44)">
       <path d="M45 68 C42 65 35 61 35 56 C35 50 42 49 46 55 C50 49 57 50 57 56 C57 61 50 65 45 68 Z" fill="#E65D76" stroke="#9F304B" strokeWidth="1.5" strokeLinejoin="round" />
       <path d="M75 68 C72 65 65 61 65 56 C65 50 72 49 76 55 C80 49 87 50 87 56 C87 61 80 65 75 68 Z" fill="#E65D76" stroke="#9F304B" strokeWidth="1.5" strokeLinejoin="round" />
       <path d="M57 58 Q60 56 63 58" fill="none" stroke="#9F304B" strokeWidth="2" strokeLinecap="round" />
       <path d="M44 53 Q47 52 48 55m27-2q3-1 4 2" fill="none" stroke="#FFE9EC" strokeWidth="1.3" strokeLinecap="round" />
       <path d="M35 57 28 55m52 2 7-2" fill="none" stroke="#9F304B" strokeWidth="2.4" strokeLinecap="round" />
-    </>
+    </g>
   ),
   crown: (
     <>
